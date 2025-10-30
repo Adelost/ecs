@@ -897,10 +897,10 @@ function createObjectSystem(
       inst.update(dt);
       if (inst.controller) inst.controller(inst, elapsed);
     });
-    // RingSystem: orient rings for all entities (tilt with axis, optional slow spin)
-    instances.forEach(inst => updateRingsForHost(inst as any, dt));
-    // CloudSystem: apply cloud drift (local +Y) for entities that have cloud layers
-    instances.forEach(inst => updateCloudsForHost(inst as any, dt));
+    // RingSystem: orient rings (skip if controlled by ECS)
+    instances.forEach(inst => { if (!(inst as any).ecsControlRings) updateRingsForHost(inst as any, dt); });
+    // CloudSystem: apply cloud drift (skip if controlled by ECS)
+    instances.forEach(inst => { if (!(inst as any).ecsControlClouds) updateCloudsForHost(inst as any, dt); });
     // TrailSystem: draw segments every ~20px at STANDARD zoom (independent of time/speed and current zoom)
     // Convert 20 px at standard zoom (ENGINE_DEFAULTS.viewport.zoom.initial) into a constant world step.
     instances.forEach(inst => {

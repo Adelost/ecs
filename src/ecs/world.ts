@@ -20,6 +20,7 @@ export class World {
   private stores: ComponentStore = new Map();
   private systems: { fn: SystemFn; phase: Phase; name: string }[] = [];
   private t = 0;
+  private resources = new Map<string | symbol, any>();
 
   // Entities
   spawn(): Eid { return this.nextEid++; }
@@ -79,5 +80,7 @@ export class World {
     run('update');
     run('late');
   }
-}
 
+  setResource<T>(key: string | symbol, value: T) { this.resources.set(key, value); }
+  getResource<T>(key: string | symbol): T { return this.resources.get(key); }
+}

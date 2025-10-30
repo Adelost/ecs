@@ -9,6 +9,8 @@ export class RenderSystem {
   private map = new Map<number, Inst>();
   constructor(private engine: Engine) {}
 
+  getInst(eid: number): Inst | undefined { return this.map.get(eid); }
+
   private ensure(e: number, r: any, axisVec: Vector3): Inst {
     let inst = this.map.get(e);
     if (inst) return inst;

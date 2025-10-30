@@ -6,6 +6,8 @@ import { OrbitSystem } from './ecs/systems/orbit';
 import { RotationSystem } from './ecs/systems/rotation';
 import { TidalLockSystem } from './ecs/systems/tidalLock';
 import { RenderSystem } from './ecs/systems/render';
+import { RingsSystem } from './ecs/systems/rings';
+import { CloudsSystem } from './ecs/systems/clouds';
 // Stylized mode (no ephemerides): we use our animation system
 
 // Time configuration
@@ -258,6 +260,9 @@ function bootstrap() {
   world.system((dt,t,w)=>OrbitSystem(dt,t,w), 'update', 'Orbit');
   world.system((dt,t,w)=>TidalLockSystem(dt,t,w), 'update', 'TidalLock');
   world.system((dt,t,w)=>RotationSystem(dt,t,w), 'update', 'Rotation');
+  world.system((dt,t,w)=>RingsSystem(dt,t,w), 'update', 'Rings');
+  world.system((dt,t,w)=>CloudsSystem(dt,t,w), 'update', 'Clouds');
+  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
 
   // Create entities from styledObjects
