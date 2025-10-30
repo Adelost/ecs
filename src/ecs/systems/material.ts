@@ -174,19 +174,43 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     }
     // Imphenzia: choose latitude for gas giants, texture quant for others
     const id = r.id.toLowerCase();
+    const palette = getPlanetPalette(id) || MATERIAL_PALETTE;
     const isGiant = ['jupiter','saturn','uranus','neptune'].some(n => id.includes(n));
     if (isGiant) {
-      bakeLatitude(inst.mesh, axis, 11, MATERIAL_PALETTE);
+      bakeLatitude(inst.mesh, axis, 11, palette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
       (inst as any).currentStyle = 'imphenzia';
     } else if (r.material?.type === 'map' && r.material.map) {
-      const ice = id.includes('earth') ? { iceLat: 0.78, iceColor: '#ffffff' } : undefined;
-      bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, MATERIAL_PALETTE, ice);
+      bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette);
       (inst as any).currentStyle = 'imphenzia';
     } else {
-      bakeLatitude(inst.mesh, axis, 6, MATERIAL_PALETTE);
+      bakeLatitude(inst.mesh, axis, 6, palette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
       (inst as any).currentStyle = 'imphenzia';
     }
   }
+}
+
+function getPlanetPalette(id: string): string[] | null {
+  const base = {
+    white: '#FFFFFF', offwhite: '#F5F5F5',
+    lightBlue: '#87CEEB', medBlue: '#1E90FF', deepBlue: '#006994', navy: '#003d6b',
+    green: '#2E7D32', brown: '#8B7355', tan: '#C2B280', desert: '#FBC02D',
+    gray1: '#EEEEEE', gray2: '#BDBDBD', gray3: '#757575', gray4: '#424242',
+    mars1: '#E8E0DC', mars2: '#D26A44', mars3: '#BF360C', mars4: '#8D3A1E', mars5: '#C27D4F',
+    venus1: '#FFF3C4', venus2: '#F6DDA5', venus3: '#EBCB88', venus4: '#D9B36C',
+    jup1: '#F2E2C4', jup2: '#D5B38B', jup3: '#B7845F', jup4: '#8C5A3C', jup5: '#6B3F29',
+    sat1: '#F5E6C8', sat2: '#E3D2A9', sat3: '#CFBA8C', sat4: '#B9A273',
+    ura1: '#CDEFF2', ura2: '#A6E0E5', ura3: '#7CCBD6', ura4: '#5BB7C5',
+    nep1: '#7FB3FF', nep2: '#3A7BDC', nep3: '#1C4FA3', nep4: '#0D2E6E'
+  } as const;
+  if (id.includes('earth')) return [base.white, base.lightBlue, base.medBlue, base.deepBlue, base.green, base.brown, base.desert];
+  if (id.includes('mars')) return [base.gray1, base.mars2, base.mars3, base.mars4, base.mars5];
+  if (id.includes('moon') || id.includes('mercury')) return [base.white, base.gray1, base.gray2, base.gray3, base.gray4];
+  if (id.includes('venus')) return [base.venus1, base.venus2, base.venus3, base.venus4];
+  if (id.includes('jupiter')) return [base.jup1, base.jup2, base.jup3, base.jup4, base.jup5];
+  if (id.includes('saturn')) return [base.sat1, base.sat2, base.sat3, base.sat4];
+  if (id.includes('uranus')) return [base.ura1, base.ura2, base.ura3, base.ura4];
+  if (id.includes('neptune')) return [base.nep1, base.nep2, base.nep3, base.nep4];
+  return null;
 }
