@@ -66,7 +66,7 @@ function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_
   geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
 }
 
-function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette = MATERIAL_PALETTE) {
+function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette: string[] | null = MATERIAL_PALETTE) {
   toNonIndexed(mesh);
   const geom = mesh.geometry;
   const pos = geom.getAttribute('position') as Float32BufferAttribute;
@@ -81,6 +81,8 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
     canvas.height = img.naturalHeight || img.height;
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const colors = new Float32Array(count * 3);
+    // Auto palette extraction if requested
+    let activePalette: string[] = palette ?? extractAutoPaletteFromCanvas(ctx, canvas, 8);
     const north = axis.clone().normalize();
     const qBase = new Quaternion().setFromUnitVectors(new Vector3(0,1,0), north);
     const ref = Math.abs(north.y) < 0.99 ? new Vector3(0,1,0) : new Vector3(1,0,0);
@@ -121,7 +123,7 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
         const data = ctx.getImageData(uv.x, uv.y, 1, 1).data;
         const rS = data[0]/255, gS = data[1]/255, bS = data[2]/255;
         const [rp,gp,bp] = posterizeRGB(rS, gS, bS, 5);
-        const c2 = nearestPaletteOKLab(rp, gp, bp, palette);
+        const c2 = nearestPaletteOKLab(rp, gp, bp, activePalette);
         samples.push(c2);
         paletteHits.set(c2.getHexString(), (paletteHits.get(c2.getHexString()) ?? 0) + 1);
       }
@@ -175,7 +177,7 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     // Imphenzia: choose latitude for gas giants, texture quant for others
     const id = r.id.toLowerCase();
     const paletteMode = s.paletteMode ?? 'planet';
-    let palette: string[] = MATERIAL_PALETTE;
+    let palette: string[] | null = MATERIAL_PALETTE;
     if (paletteMode === 'universal') {
       palette = UNIVERSAL_PALETTE;
     } else if (paletteMode === 'planet') {
@@ -188,10 +190,9 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
       (inst as any).currentStyle = 'imphenzia';
     } else if (r.material?.type === 'map' && r.material.map) {
       if (paletteMode === 'auto') {
-        const auto = getAutoPalette(r.material.map, 8);
-        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, auto);
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, null);
       } else {
-        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette);
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette as string[]);
       }
       (inst as any).currentStyle = 'imphenzia';
     } else {
@@ -243,14 +244,40 @@ const UNIVERSAL_PALETTE: string[] = [
 ];
 
 // Auto palette extraction via simple k-means clustering in sRGB (then OKLab match during bake)
-const AUTO_PALETTE_CACHE = new Map<string, string[]>();
-function getAutoPalette(textureUrl: string, k: number = 8): string[] {
-  const cached = AUTO_PALETTE_CACHE.get(textureUrl);
-  if (cached) return cached;
-  // We don't have direct image data here; we will create a temporary image+canvas synchronously is hard.
-  // Instead, approximate by returning UNIVERSAL_PALETTE on first pass; at bake time, we already read from canvas.
-  // For a robust implementation, we would precompute palettes when loading textures.
-  // Here we return UNIVERSAL_PALETTE as a fallback to keep flow simple.
-  AUTO_PALETTE_CACHE.set(textureUrl, UNIVERSAL_PALETTE);
-  return UNIVERSAL_PALETTE;
+function extractAutoPaletteFromCanvas(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, k: number = 8): string[] {
+  // Sample random pixels from the canvas
+  const S = Math.min(1200, Math.floor(canvas.width * canvas.height / 50));
+  const samples: Array<[number, number, number]> = [];
+  for (let i = 0; i < S; i++) {
+    const x = Math.floor(Math.random() * canvas.width);
+    const y = Math.floor(Math.random() * canvas.height);
+    const d = ctx.getImageData(x, y, 1, 1).data;
+    samples.push([d[0]/255, d[1]/255, d[2]/255]);
+  }
+  // Initialize centroids as random samples
+  const centroids = samples.slice(0).sort(() => Math.random() - 0.5).slice(0, k);
+  const iter = 6;
+  for (let it = 0; it < iter; it++) {
+    const sums = new Array(k).fill(0).map(() => [0,0,0,0]);
+    for (const s of samples) {
+      let bi = 0, bd = Infinity;
+      for (let ci = 0; ci < k; ci++) {
+        const c = centroids[ci];
+        const dr = c[0]-s[0], dg = c[1]-s[1], db = c[2]-s[2];
+        const d = dr*dr + dg*dg + db*db;
+        if (d < bd) { bd = d; bi = ci; }
+      }
+      const acc = sums[bi]; acc[0] += s[0]; acc[1] += s[1]; acc[2] += s[2]; acc[3] += 1;
+    }
+    for (let ci = 0; ci < k; ci++) {
+      const acc = sums[ci];
+      if (acc[3] > 0) centroids[ci] = [acc[0]/acc[3], acc[1]/acc[3], acc[2]/acc[3]];
+      else centroids[ci] = samples[Math.floor(Math.random()*samples.length)];
+    }
+  }
+  // Convert to hex strings
+  const hex = centroids.map(c => new Color(c[0], c[1], c[2]).getHexString());
+  // Make unique-ish
+  const uniq = Array.from(new Set(hex)).map(h => `#${h}`);
+  return uniq;
 }
