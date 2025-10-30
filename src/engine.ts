@@ -63,6 +63,8 @@ const DEBUG_EQUATOR_BIG = false; // big equator band ~2x radius
 const DEBUG_RING_GUIDE = false;  // world-XY guide at ring extents
 const DEBUG_AXIS = false;
 
+import { createUI, type UIManager } from './ui';
+
 export interface Engine {
   readonly renderer: WebGLRenderer;
   readonly composer: EffectComposer;
@@ -70,6 +72,7 @@ export interface Engine {
   readonly camera: OrthographicCamera;
   readonly grid: { snap(p: Vec2): Vec2 } | null;
   readonly objects: ReturnType<typeof createObjectSystem>;
+  readonly ui: UIManager;
   addTextLabel(text: string, position: Vec2, options?: { color?: string; fontSize?: number; fontFamily?: string; worldHeight?: number; padding?: number; background?: string; center?: boolean }): Sprite;
   drawLine(x1: number, y1: number, x2: number, y2: number, color?: string, opacity?: number): Line;
   render(): void;
@@ -1334,5 +1337,8 @@ function updateCursor(e?: PointerEvent) {
     config.container.removeChild(renderer.domElement);
   }
 
-  return { renderer, composer, scene, camera, grid, objects, addTextLabel, drawLine: addLine, render, setCanvasSize, setView, getView, dispose };
+  // UI manager (DOM overlay controls)
+  const ui = createUI(document);
+
+  return { renderer, composer, scene, camera, grid, objects, ui, addTextLabel, drawLine: addLine, render, setCanvasSize, setView, getView, dispose };
 }

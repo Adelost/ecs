@@ -235,8 +235,8 @@ function bootstrap() {
   // Then bake materials for the now-current geometry
   world.system(MaterialSystem, 'late', 'Material');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
-  // Build UI now that world exists
-  setupSpeedUI(world);
+  // Build UI now that world exists (engine-level UI toolkit)
+  setupControls(engine, world);
 
   // Create entities from styledObjects using batch and spawnWith
   const idToEid = new Map<string, number>();
@@ -295,6 +295,67 @@ function bootstrap() {
 }
 
 bootstrap();
+
+// New, engine-integrated UI controls (reusable across demos)
+function setupControls(engine: ReturnType<typeof createEngine>, world: World) {
+  const panel = engine.ui.createPanel({ position: 'bottom-left', title: 'Time Speed', minWidth: 260 });
+  const presetRow = document.createElement('div'); presetRow.className = 'ui-row'; panel.el.appendChild(presetRow);
+  const sliderCtl = panel.addSlider({ min: 0, max: 1, step: 0.001 });
+  const readout = panel.addText({ text: '' });
+
+  // Timescale definitions
+  const FAST_TIMESCALE = EARTH_YEAR_SECONDS; // 1y/s
+  const REALTIME_SCALE = REAL_SECONDS_PER_EARTH_DAY / (24 * 60 * 60);
+  const DAY_PER_2S_SCALE = REAL_SECONDS_PER_EARTH_DAY / 2;
+  let reverse = false;
+
+  function updateReadout(scaleAbs: number) {
+    const signed = reverse ? -scaleAbs : scaleAbs;
+    const daySec = REAL_SECONDS_PER_EARTH_DAY / scaleAbs;
+    const fmt = (s: number) => { if (s >= 3600) return `${(s/3600).toFixed(1)}h`; if (s >= 60) return `${(s/60).toFixed(1)}m`; return `${s.toFixed(1)}s`; };
+    if (reverse) readout.innerHTML = `<span style="color: #ff6b6b;">← REVERSE</span> • 1 day = ${fmt(daySec)}`;
+    else readout.textContent = `1 day = ${fmt(daySec)}`;
+    SOLAR_SYSTEM.timeScale = signed;
+  }
+  function sliderToTimescale(t: number) { const a = Math.log(FAST_TIMESCALE); const b = Math.log(REALTIME_SCALE); return Math.exp(a * t + b * (1 - t)); }
+  function timescaleToSlider(scale: number) { const a = Math.log(FAST_TIMESCALE); const b = Math.log(REALTIME_SCALE); const s = Math.max(Math.min(scale, FAST_TIMESCALE), REALTIME_SCALE); return Math.max(0, Math.min(1, (Math.log(s) - b) / (a - b))); }
+  function applyScaleFromSlider() { const t = parseFloat(sliderCtl.input.value); const scaleAbs = sliderToTimescale(t); updateReadout(scaleAbs); }
+  sliderCtl.input.addEventListener('input', applyScaleFromSlider);
+
+  // Presets + reverse
+  const presets: Array<{ label: string; scale: number }> = [
+    { label: '1d/min', scale: REAL_SECONDS_PER_EARTH_DAY / 60 },
+    { label: '1d/s',   scale: REAL_SECONDS_PER_EARTH_DAY / 1 },
+    { label: '1y/min', scale: EARTH_YEAR_SECONDS / 60 },
+  ];
+  function createChip(labelText: string, scale: number) { const chip = document.createElement('button'); chip.className='ui-chip'; chip.textContent=labelText; chip.addEventListener('click',()=>{ const t = timescaleToSlider(scale); sliderCtl.input.value = `${t}`; applyScaleFromSlider(); }); return chip; }
+  const reverseChip = document.createElement('button'); reverseChip.className='ui-chip'; reverseChip.textContent='← Reverse'; presetRow.appendChild(reverseChip);
+  reverseChip.addEventListener('click',(e)=>{ e.stopPropagation(); reverse=!reverse; const t = parseFloat(sliderCtl.input.value); const scaleAbs = sliderToTimescale(t); updateReadout(scaleAbs); reverseChip.style.background = reverse? 'rgba(255,107,107,0.4)': 'rgba(255,255,255,0.1)'; reverseChip.style.borderColor = reverse? 'rgba(255,107,107,0.7)':'rgba(255,255,255,0.3)'; reverseChip.style.color = reverse? '#ffcccc':'#fff'; });
+  presets.forEach(p => presetRow.appendChild(createChip(p.label, p.scale)));
+
+  panel.addDivider();
+  const styleRow = document.createElement('div'); styleRow.className='ui-row'; panel.el.appendChild(styleRow);
+  const styleLabel = document.createElement('div'); styleLabel.textContent='Style:'; styleLabel.style.fontSize='11px'; styleLabel.style.opacity='0.7'; styleLabel.style.marginRight='4px';
+  function mkStyleBtn(text: string) { const b = document.createElement('button'); b.className='ui-chip'; b.style.flex='1'; b.textContent=text; return b; }
+  const texturedBtn = mkStyleBtn('Textured'); const autoBtn = mkStyleBtn('Low-poly');
+  autoBtn.style.background = 'rgba(29,185,84,0.3)'; autoBtn.style.borderColor = 'rgba(29,185,84,0.6)';
+  texturedBtn.addEventListener('click', (e)=>{ e.stopPropagation(); texturedBtn.style.background='rgba(29,185,84,0.3)'; texturedBtn.style.borderColor='rgba(29,185,84,0.6)'; autoBtn.style.background='rgba(255,255,255,0.1)'; autoBtn.style.borderColor='rgba(255,255,255,0.3)'; const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>; for (const [eid] of entries) { (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = 'textured'; }); } });
+  autoBtn.addEventListener('click', (e)=>{ e.stopPropagation(); autoBtn.style.background='rgba(29,185,84,0.3)'; autoBtn.style.borderColor='rgba(29,185,84,0.6)'; texturedBtn.style.background='rgba(255,255,255,0.1)'; texturedBtn.style.borderColor='rgba(255,255,255,0.3)'; const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>; for (const [eid] of entries) { (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = 'auto'; }); } });
+  styleRow.appendChild(styleLabel); styleRow.appendChild(texturedBtn); styleRow.appendChild(autoBtn);
+
+  panel.addHeader('Detail');
+  const detailSliderCtl = panel.addSlider({ min: 0, max: 20, step: 1, value: 4 });
+  const detailInfo = document.createElement('div'); detailInfo.style.fontSize='11px'; detailInfo.style.opacity='0.8'; detailInfo.style.textAlign='center'; detailInfo.style.marginTop='4px'; panel.el.appendChild(detailInfo);
+  function updateDetailInfo(){ const n = parseInt(detailSliderCtl.input.value, 10); const faces = 20 * (n + 1) * (n + 1); const label = n === 0 ? 'Icosahedron' : `Subdiv ${n}`; detailInfo.textContent = `${label} • triangles ${faces.toLocaleString()}`; }
+  detailSliderCtl.input.addEventListener('input', ()=>{ const n = parseInt(detailSliderCtl.input.value, 10); const res:any = (world as any).getResource('render'); if (res?.setAutoSubdiv) res.setAutoSubdiv(n); updateDetailInfo(); }); updateDetailInfo();
+
+  panel.addProfiler(
+    () => ((world as any).getProfilerSnapshot() as Array<{ system: string; lastMs: number; avgMs: number }>).map(r => ({ system: r.system, avgMs: r.avgMs })),
+    (on: boolean) => { (world as any).enableProfiler(on); }
+  );
+
+  sliderCtl.input.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`; applyScaleFromSlider();
+}
 
 function setupSpeedUI(world: World) {
   const wrap = document.createElement('div');
