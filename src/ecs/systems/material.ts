@@ -154,7 +154,7 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     const styleKey = s.mode === 'imphenzia' ? `imphenzia:${s.paletteMode ?? 'planet'}` : 'realistic';
     if ((inst as any).currentStyle === styleKey) continue;
     const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
-    if (desired === 'realistic') {
+    if (s.mode === 'realistic') {
       // Rebuild map material from Renderable
       if (r.material?.type === 'map') {
         const tl = new TextureLoader();
