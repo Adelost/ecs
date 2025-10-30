@@ -3,13 +3,13 @@ import type { Engine } from '../../src/engine';
 import { World } from '../world';
 import { Transform, Orientation, Renderable } from '../components';
 
-type Inst = { group: Group; mesh: Mesh };
+type Inst = { group: Group; mesh: Mesh; objRef: any };
 
 export class RenderSystem {
   private map = new Map<number, Inst>();
   constructor(private engine: Engine) {}
 
-  private ensure(e: number, r: any): Inst {
+  private ensure(e: number, r: any, axisVec: Vector3): Inst {
     let inst = this.map.get(e);
     if (inst) return inst;
     // Create via existing engine object system for consistency
@@ -30,7 +30,13 @@ export class RenderSystem {
     this.engine.objects.wireParenting([]); // no-op but keeps parity
     const obj = this.engine.objects.getObject(r.id);
     if (!obj) throw new Error('failed to create render object for ' + r.id);
-    inst = { group: (obj as any).group, mesh: (obj as any).mesh };
+    const qBase = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), axisVec);
+    // Populate engine instance fields used by ring/orbit helpers
+    (obj as any).baseQuat = qBase;
+    (obj as any).spinAxis = axisVec.clone();
+    ((obj as any).mesh as any).__baseQuat = qBase;
+    ((obj as any).mesh as any).__spinAxis = axisVec.clone();
+    inst = { group: (obj as any).group, mesh: (obj as any).mesh, objRef: obj };
     this.map.set(e, inst);
     return inst;
   }
@@ -38,10 +44,10 @@ export class RenderSystem {
   update(w: World) {
     const entries = w.query(Transform, Orientation, Renderable);
     for (const [e, t, o, r] of entries) {
-      const inst = this.ensure(e, r);
+      const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
+      const inst = this.ensure(e, r, axis);
       inst.group.position.set(t.x, t.y, inst.group.position.z);
       // Compose quaternion: spin around axis then base (+Y → axis)
-      const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
       const qSpin = new Quaternion().setFromAxisAngle(axis, o.angle);
       const qBase = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), axis);
       inst.mesh.quaternion.multiplyQuaternions(qSpin, qBase);
