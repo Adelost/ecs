@@ -1334,6 +1334,8 @@ function updateCursor(e?: PointerEvent) {
     canvas.removeEventListener('contextmenu', onContextMenu);
     window.removeEventListener('keydown', onKeyDown);
     renderer.dispose();
+    // Tear down UI overlays
+    ui.destroy();
     config.container.removeChild(renderer.domElement);
   }
 
