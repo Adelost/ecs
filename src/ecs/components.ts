@@ -4,13 +4,15 @@ import type { Eid } from './world';
 export type Vec2 = { x: number; y: number };
 export type Vec3 = { x: number; y: number; z: number };
 
-// Core spatial
+// Core spatial (rotation handled by Orientation/Rotation)
 export const Transform = component<{ x: number; y: number }>('Transform');
 export const Orientation = component<{ axis: Vec3; angle: number }>('Orientation');
-export const Parent = component<{ parent: Eid | null }>('Parent');
+export const Parent = component<{ parentEid: Eid }>('Parent');
 
 // Motion
-export const Orbit = component<{ parent: Eid | null; radius: number; angularSpeed: number; angle: number }>('Orbit');
+// angle: radians, angularSpeed: rad/s
+export const Orbit = component<{ parentEid: Eid; radius: number; angularSpeed: number; angle: number }>('Orbit');
+// angle: radians, spinRate: rad/s
 export const Rotation = component<{ axis: Vec3; spinRate: number; angle: number }>('Rotation');
 export const TidalLock = component<{}>('TidalLock');
 

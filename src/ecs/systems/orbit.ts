@@ -1,4 +1,4 @@
-import { World } from '../world';
+import { World, NO_PARENT } from '../world';
 import { Transform, Orbit } from '../components';
 
 export function OrbitSystem(dt: number, _t: number, w: World) {
@@ -8,8 +8,9 @@ export function OrbitSystem(dt: number, _t: number, w: World) {
   const q = (OrbitSystem as any)._q as () => [number, any, any][];
   for (const [_e, t, o] of q()) {
     o.angle += o.angularSpeed * dt;
-    const px = (o.parent && w.get(o.parent, Transform)?.x) ?? 0;
-    const py = (o.parent && w.get(o.parent, Transform)?.y) ?? 0;
+    const hasParent = o.parentEid !== NO_PARENT;
+    const px = hasParent ? (w.get(o.parentEid, Transform)?.x ?? 0) : 0;
+    const py = hasParent ? (w.get(o.parentEid, Transform)?.y ?? 0) : 0;
     t.x = px + Math.cos(o.angle) * o.radius;
     t.y = py + Math.sin(o.angle) * o.radius;
   }

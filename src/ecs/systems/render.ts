@@ -157,8 +157,10 @@ export class RenderSystem {
     return inst;
   }
 
+  private q: (() => [number, any, any, any][]) | null = null;
   update(w: World) {
-    const entries = w.query(Transform, Orientation, Renderable);
+    if (!this.q) this.q = w.cached(Transform, Orientation, Renderable);
+    const entries = this.q();
     const present = new Set<number>();
     for (const [e, t, o, r] of entries) {
       present.add(e);

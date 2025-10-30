@@ -1,6 +1,6 @@
 import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
-import { World } from './ecs/world';
+import { World, NO_PARENT } from './ecs/world';
 import { ENGINE_DEFAULTS } from './types';
 import { Style as CEStyle } from './ecs/components';
 import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock, Trail as CETrail } from './ecs/components';
@@ -262,13 +262,13 @@ function bootstrap() {
   const world = new World();
   const renderSystem = new RenderSystem(engine);
   // Register systems
-  world.system((dt,t,w)=>OrbitSystem(dt,t,w), 'update', 'Orbit');
-  world.system((dt,t,w)=>TidalLockSystem(dt,t,w), 'update', 'TidalLock');
-  world.system((dt,t,w)=>RotationSystem(dt,t,w), 'update', 'Rotation');
-  world.system((dt,t,w)=>RingsSystem(dt,t,w), 'update', 'Rings');
-  world.system((dt,t,w)=>CloudsSystem(dt,t,w), 'update', 'Clouds');
-  world.system((dt,t,w)=>TrailSystem(dt,t,w), 'update', 'Trail');
-  world.system((dt,t,w)=>MaterialSystem(dt,t,w), 'late', 'Material');
+  world.system(OrbitSystem, 'update', 'Orbit');
+  world.system(TidalLockSystem, 'update', 'TidalLock');
+  world.system(RotationSystem, 'update', 'Rotation');
+  world.system(RingsSystem, 'update', 'Rings');
+  world.system(CloudsSystem, 'update', 'Clouds');
+  world.system(TrailSystem, 'update', 'Trail');
+  world.system(MaterialSystem, 'late', 'Material');
   world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
@@ -293,8 +293,8 @@ function bootstrap() {
       const orbitAnim = (obj.animations ?? []).find(a => a.type === 'orbit');
       const radius = orbitAnim?.radius ?? 0;
       const angSpeed = (orbitAnim?.speed ?? 0) * Math.PI * 2;
-      world.attach(e, COrbit, { parent: null, radius, angularSpeed: angSpeed, angle: 0 });
-      world.attach(e, CParent, { parent: null });
+      world.attach(e, COrbit, { parentEid: NO_PARENT, radius, angularSpeed: angSpeed, angle: 0 });
+      world.attach(e, CParent, { parentEid: NO_PARENT });
       // Heuristic: attach TidalLock if rotate and orbit speeds match (within small epsilon)
       if (rotAnim && orbitAnim) {
         const rotRps = rotAnim.speed ?? 0;
@@ -322,8 +322,8 @@ function bootstrap() {
     if (!obj.parent) continue;
     const child = idToEid.get(obj.id)!;
     const parent = idToEid.get(obj.parent)!;
-    const o = world.get(child, COrbit); if (o) o.parent = parent;
-    const p = world.get(child, CParent); if (p) p.parent = parent;
+    const o = world.get(child, COrbit); if (o) o.parentEid = parent;
+    const p = world.get(child, CParent); if (p) p.parentEid = parent;
   }
 
 

@@ -162,12 +162,7 @@ export class World {
     return rows.sort((a, b) => b.avgMs - a.avgMs);
   }
 
-  // Spawn helper (cold path)
-  spawnWith(pairs: Array<[ComponentKey<any>, any]>): Eid {
-    const e = this.spawn();
-    for (const [k, data] of pairs) this.attach(e, k as any, data);
-    return e;
-  }
+  // (Optional) object-form spawn helper can be added later following project schema
 }
 
 // Sentinel parent id
