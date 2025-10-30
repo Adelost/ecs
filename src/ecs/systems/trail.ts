@@ -12,8 +12,6 @@ export function TrailSystem(_dt: number, _t: number, w: World) {
   for (const [eid, trail, r] of entries) {
     const inst = render.getInst(eid);
     if (!inst) continue;
-    // gate engine trail updates
-    (inst.objRef as any).ecsControlTrails = true;
     const wp = new Vector3();
     inst.objRef.group.getWorldPosition(wp);
     if (!trail.last) { trail.last = { x: wp.x, y: wp.y }; continue; }
@@ -54,4 +52,3 @@ export function TrailSystem(_dt: number, _t: number, w: World) {
     }
   }
 }
-
