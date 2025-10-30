@@ -322,11 +322,8 @@ function bootstrap() {
     const rawDt = Math.min((time - lastTime) / 1000, 0.1);
     const dt = rawDt * SOLAR_SYSTEM.timeScale;
     lastTime = time;
-    // Pass both dt (sim time) and rawDt (real time) so trail sampling can throttle by real-time seconds
-    // Step ECS (orbits/rotations), then update render system in 'late' phase
+    // Step ECS (orbits/rotations); RenderSystem runs in 'late' phase
     world.step(dt);
-    // Keep engine systems (rings/trails/labels) updating
-    engine.objects.update(dt, rawDt);
     engine.render();
     requestAnimationFrame(animate);
   }
