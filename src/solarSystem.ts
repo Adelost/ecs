@@ -514,6 +514,44 @@ function setupSpeedUI() {
     }
   });
 
+  // Profiler overlay
+  const profWrap = document.createElement('div');
+  profWrap.style.marginTop = '6px';
+  const profLabel = document.createElement('label');
+  profLabel.style.cursor = 'pointer';
+  const profCheckbox = document.createElement('input');
+  profCheckbox.type = 'checkbox';
+  profCheckbox.style.marginRight = '6px';
+  profLabel.appendChild(profCheckbox);
+  profLabel.appendChild(document.createTextNode('Profiler'));
+  profWrap.appendChild(profLabel);
+  const profPanel = document.createElement('pre');
+  profPanel.style.margin = '4px 0 0 0';
+  profPanel.style.padding = '4px 6px';
+  profPanel.style.background = 'rgba(0,0,0,0.25)';
+  profPanel.style.borderRadius = '4px';
+  profPanel.style.maxHeight = '120px';
+  profPanel.style.overflow = 'auto';
+  profPanel.style.display = 'none';
+  wrap.appendChild(profWrap);
+  wrap.appendChild(profPanel);
+  let profTimer: number | null = null;
+  function refreshProfiler() {
+    const rows = (world as any).getProfilerSnapshot() as Array<{ system: string; lastMs: number; avgMs: number }>;
+    const lines = rows.map(r => `${r.system.padEnd(12)} ${r.avgMs.toFixed(3)} ms (last ${r.lastMs.toFixed(3)})`);
+    profPanel.textContent = lines.join('\n') || 'No data yet...';
+  }
+  profCheckbox.addEventListener('change', () => {
+    const on = profCheckbox.checked;
+    (world as any).enableProfiler(on);
+    profPanel.style.display = on ? 'block' : 'none';
+    if (profTimer) { clearInterval(profTimer); profTimer = null; }
+    if (on) {
+      refreshProfiler();
+      profTimer = window.setInterval(refreshProfiler, 1000) as unknown as number;
+    }
+  });
+
   // Initialize: set slider to default 1 day / 2 seconds and update
   slider.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`;
   applyScaleFromSlider();
