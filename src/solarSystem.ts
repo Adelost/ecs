@@ -513,6 +513,28 @@ function setupSpeedUI(world: World) {
     }
   });
 
+  // Palette mode selector
+  const palWrap = document.createElement('div');
+  palWrap.style.marginTop = '4px';
+  const palLabel = document.createElement('label');
+  palLabel.textContent = 'Palette:';
+  palLabel.style.marginRight = '6px';
+  const palSelect = document.createElement('select');
+  [['planet','Planet'], ['universal','Universal'], ['auto','Auto']].forEach(([val, text]) => {
+    const opt = document.createElement('option'); opt.value = val; opt.textContent = text; palSelect.appendChild(opt);
+  });
+  (palSelect as HTMLSelectElement).value = 'planet';
+  palWrap.appendChild(palLabel);
+  palWrap.appendChild(palSelect);
+  wrap.appendChild(palWrap);
+  palSelect.addEventListener('change', () => {
+    const val = (palSelect as HTMLSelectElement).value;
+    const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>;
+    for (const [eid] of entries) {
+      (world as any).mutate(eid, CEStyle, (s: any) => { s.paletteMode = val; });
+    }
+  });
+
   // Profiler overlay
   const profWrap = document.createElement('div');
   profWrap.style.marginTop = '6px';

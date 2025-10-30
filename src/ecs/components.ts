@@ -25,4 +25,4 @@ export const Renderable = component<{ id: string; size: number; material: Textur
 export const Trail = component<{ step: number; cap: number; lines: any[]; last?: { x: number; y: number } }>('Trail');
 
 // Style
-export const Style = component<{ mode: 'realistic' | 'imphenzia' }>('Style');
+export const Style = component<{ mode: 'realistic' | 'imphenzia'; paletteMode?: 'planet' | 'universal' | 'auto' }>('Style');

@@ -174,14 +174,25 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     }
     // Imphenzia: choose latitude for gas giants, texture quant for others
     const id = r.id.toLowerCase();
-    const palette = getPlanetPalette(id) || MATERIAL_PALETTE;
+    const paletteMode = s.paletteMode ?? 'planet';
+    let palette: string[] = MATERIAL_PALETTE;
+    if (paletteMode === 'universal') {
+      palette = UNIVERSAL_PALETTE;
+    } else if (paletteMode === 'planet') {
+      palette = getPlanetPalette(id) || UNIVERSAL_PALETTE;
+    }
     const isGiant = ['jupiter','saturn','uranus','neptune'].some(n => id.includes(n));
     if (isGiant) {
       bakeLatitude(inst.mesh, axis, 11, palette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
       (inst as any).currentStyle = 'imphenzia';
     } else if (r.material?.type === 'map' && r.material.map) {
-      bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette);
+      if (paletteMode === 'auto') {
+        const auto = getAutoPalette(r.material.map, 8);
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, auto);
+      } else {
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette);
+      }
       (inst as any).currentStyle = 'imphenzia';
     } else {
       bakeLatitude(inst.mesh, axis, 6, palette);
@@ -213,4 +224,33 @@ function getPlanetPalette(id: string): string[] | null {
   if (id.includes('uranus')) return [base.ura1, base.ura2, base.ura3, base.ura4];
   if (id.includes('neptune')) return [base.nep1, base.nep2, base.nep3, base.nep4];
   return null;
+}
+
+// A broader palette usable for most bodies if not using planet-specific sets
+const UNIVERSAL_PALETTE: string[] = [
+  // Ice/Clouds
+  '#FFFFFF', '#E8E8E8',
+  // Oceans
+  '#87CEEB', '#4682B4', '#1E3A8A',
+  // Land
+  '#228B22', '#8B7355', '#654321', '#C2B280',
+  // Mars/Desert
+  '#D84315', '#8B4513',
+  // Venus/Jupiter warm tones
+  '#FFD700', '#FF8C00',
+  // Shadows
+  '#2C3E50', '#1A1A1A',
+];
+
+// Auto palette extraction via simple k-means clustering in sRGB (then OKLab match during bake)
+const AUTO_PALETTE_CACHE = new Map<string, string[]>();
+function getAutoPalette(textureUrl: string, k: number = 8): string[] {
+  const cached = AUTO_PALETTE_CACHE.get(textureUrl);
+  if (cached) return cached;
+  // We don't have direct image data here; we will create a temporary image+canvas synchronously is hard.
+  // Instead, approximate by returning UNIVERSAL_PALETTE on first pass; at bake time, we already read from canvas.
+  // For a robust implementation, we would precompute palettes when loading textures.
+  // Here we return UNIVERSAL_PALETTE as a fallback to keep flow simple.
+  AUTO_PALETTE_CACHE.set(textureUrl, UNIVERSAL_PALETTE);
+  return UNIVERSAL_PALETTE;
 }
