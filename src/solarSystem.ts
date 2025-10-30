@@ -10,6 +10,7 @@ import { RenderSystem } from './ecs/systems/render';
 import { RingsSystem } from './ecs/systems/rings';
 import { CloudsSystem } from './ecs/systems/clouds';
 import { TrailSystem } from './ecs/systems/trail';
+import { LabelSystem } from './ecs/systems/label';
 // Stylized mode (no ephemerides): we use our animation system
 
 // Time configuration
@@ -265,8 +266,9 @@ function bootstrap() {
   world.system((dt,t,w)=>RingsSystem(dt,t,w), 'update', 'Rings');
   world.system((dt,t,w)=>CloudsSystem(dt,t,w), 'update', 'Clouds');
   world.system((dt,t,w)=>TrailSystem(dt,t,w), 'update', 'Trail');
-  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2) });
+  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
+  world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
 
   // Create entities from styledObjects
   const idToEid = new Map<string, number>();
