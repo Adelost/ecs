@@ -357,6 +357,7 @@ function setupControls(engine: ReturnType<typeof createEngine>, world: World) {
   sliderCtl.input.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`; applyScaleFromSlider();
 }
 
+/* Legacy UI (deprecated): replaced by setupControls using engine.ui */
 function setupSpeedUI(world: World) {
   const wrap = document.createElement('div');
   wrap.style.position = 'fixed';
