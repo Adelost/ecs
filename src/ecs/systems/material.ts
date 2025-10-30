@@ -9,6 +9,40 @@ function toNonIndexed(mesh: Mesh) {
 
 function hexToRgb(hex: string): [number, number, number] { const c = new Color(hex); return [c.r, c.g, c.b]; }
 
+// Posterize luminance into a small number of bands, keep hue by scaling RGB
+function posterizeRGB(r: number, g: number, b: number, bands = 5): [number, number, number] {
+  const lum = 0.2126*r + 0.7152*g + 0.0722*b; // sRGB luminance
+  if (lum <= 1e-6) return [0,0,0];
+  const q = Math.round(lum * (bands-1)) / (bands-1);
+  const s = Math.max(0, Math.min(3, q / lum));
+  return [Math.max(0, Math.min(1, r*s)), Math.max(0, Math.min(1, g*s)), Math.max(0, Math.min(1, b*s))];
+}
+
+// OKLab conversion (sRGB -> linear -> OKLab), see https://bottosson.github.io/posts/oklab/
+function srgbToLinear(c: number) { return c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+function rgbToOklab(r: number, g: number, b: number): [number, number, number] {
+  const rl = srgbToLinear(r), gl = srgbToLinear(g), bl = srgbToLinear(b);
+  const l_ = 0.4122214708*rl + 0.5363325363*gl + 0.0514459929*bl;
+  const m_ = 0.2119034982*rl + 0.6806995451*gl + 0.1073969566*bl;
+  const s_ = 0.0883024619*rl + 0.2817188376*gl + 0.6299787005*bl;
+  const l = Math.cbrt(l_), m = Math.cbrt(m_), s = Math.cbrt(s_);
+  const L = 0.2104542553*l + 0.7936177850*m - 0.0040720468*s;
+  const A = 1.9779984951*l - 2.4285922050*m + 0.4505937099*s;
+  const B = 0.0259040371*l + 0.7827717662*m - 0.8086757660*s;
+  return [L, A, B];
+}
+function nearestPaletteOKLab(r: number, g: number, b: number, palette: string[]): Color {
+  const [L, A, B] = rgbToOklab(r, g, b);
+  let best = 0, bestD = Infinity;
+  for (let i=0;i<palette.length;i++){
+    const c = new Color(palette[i]);
+    const [L2, A2, B2] = rgbToOklab(c.r, c.g, c.b);
+    const d = (L-L2)*(L-L2) + (A-A2)*(A-A2) + (B-B2)*(B-B2);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return new Color(palette[best]);
+}
+
 function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_PALETTE) {
   toNonIndexed(mesh);
   const geom = mesh.geometry;
@@ -32,7 +66,7 @@ function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_
   geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
 }
 
-function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette = MATERIAL_PALETTE, opts?: { iceLat?: number; iceColor?: string }) {
+function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette = MATERIAL_PALETTE) {
   toNonIndexed(mesh);
   const geom = mesh.geometry;
   const pos = geom.getAttribute('position') as Float32BufferAttribute;
@@ -65,37 +99,37 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
       const uProjV = unitWorld.dot(Vaxis);
       const uAngle = Math.atan2(uProjV, uProjU);
       const uSph = (uAngle + Math.PI) / (2*Math.PI);
-      const x = Math.min(canvas.width-1, Math.floor(((uSph%1+1)%1) * canvas.width));
-      const y = Math.min(canvas.height-1, Math.floor(vSph * canvas.height));
-      const data = ctx.getImageData(x, y, 1, 1).data;
-      // Polar override only if the sampled pixel is truly near white
-      const iceLat = opts?.iceLat ?? -1;
-      const isPolar = iceLat >= 0 && (lat01 >= iceLat || lat01 <= (1 - iceLat));
-      let usedOverride = false;
-      if (isPolar && opts?.iceColor) {
-        const r = data[0]/255, g = data[1]/255, b = data[2]/255;
-        const maxc = Math.max(r,g,b), minc = Math.min(r,g,b);
-        const chroma = maxc - minc;                    // colorfulness
-        const luminance = 0.2126*r + 0.7152*g + 0.0722*b; // perceived brightness
-        if (luminance > 0.9 && chroma < 0.08) { // truly close to white
-          const c2 = new Color(opts.iceColor);
-          for (let k=0;k<3;k++){ colors[3*(i+k)+0]=c2.r; colors[3*(i+k)+1]=c2.g; colors[3*(i+k)+2]=c2.b; }
-          usedOverride = true;
-        }
+      // Sample 4 points (v1,v2,v3,centroid), posterize, then find nearest in OKLab; choose dominant
+      const idxs = [i+0, i+1, i+2];
+      const samples: Color[] = [];
+      const uvs: Array<{x:number,y:number}> = [];
+      // vertices
+      for (const j of idxs) {
+        const vx = pos.getX(j), vy = pos.getY(j), vz = pos.getZ(j);
+        const uw = new Vector3(vx,vy,vz).normalize().applyQuaternion(qBase);
+        const upu = uw.dot(Uaxis), upv = uw.dot(Vaxis);
+        const ang = Math.atan2(upv, upu);
+        const uu = (ang + Math.PI) / (2*Math.PI);
+        const dd = Math.acos(Math.max(-1, Math.min(1, uw.dot(north)))) / Math.PI;
+        const vv = dd;
+        uvs.push({ x: Math.min(canvas.width-1, Math.floor(((uu%1+1)%1) * canvas.width)), y: Math.min(canvas.height-1, Math.floor(vv * canvas.height)) });
       }
-      if (!usedOverride) {
-        // Quantize to nearest palette color
-        let bestIdx = 0, bestD = 1e9;
+      // centroid
+      uvs.push({ x: Math.min(canvas.width-1, Math.floor(((uSph%1+1)%1) * canvas.width)), y: Math.min(canvas.height-1, Math.floor(vSph * canvas.height)) });
+      const paletteHits = new Map<string, number>();
+      for (const uv of uvs) {
+        const data = ctx.getImageData(uv.x, uv.y, 1, 1).data;
         const rS = data[0]/255, gS = data[1]/255, bS = data[2]/255;
-        for (let p=0;p<palette.length;p++){
-          const c = new Color(palette[p]);
-          const dr = c.r - rS, dg = c.g - gS, db = c.b - bS;
-          const d = dr*dr + dg*dg + db*db;
-          if (d < bestD){ bestD = d; bestIdx = p; }
-        }
-        const c2 = new Color(palette[bestIdx]);
-        for (let k=0;k<3;k++){ colors[3*(i+k)+0]=c2.r; colors[3*(i+k)+1]=c2.g; colors[3*(i+k)+2]=c2.b; }
+        const [rp,gp,bp] = posterizeRGB(rS, gS, bS, 5);
+        const c2 = nearestPaletteOKLab(rp, gp, bp, palette);
+        samples.push(c2);
+        paletteHits.set(c2.getHexString(), (paletteHits.get(c2.getHexString()) ?? 0) + 1);
       }
+      // Choose dominant palette color
+      let bestHex = samples[0].getHexString(), bestCount = 0;
+      paletteHits.forEach((count, hex) => { if (count > bestCount) { bestCount = count; bestHex = hex; } });
+      const chosen = new Color(`#${bestHex}`);
+      for (let k=0;k<3;k++){ colors[3*(i+k)+0]=chosen.r; colors[3*(i+k)+1]=chosen.g; colors[3*(i+k)+2]=chosen.b; }
     }
     geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
     // Switch mesh material to vertexColors
