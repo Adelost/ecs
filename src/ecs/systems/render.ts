@@ -149,7 +149,9 @@ export class RenderSystem {
       const mat = new MeshStandardMaterial({ map: r.atmosphere.map ? tl.load(r.atmosphere.map) : undefined, alphaMap: r.atmosphere.alpha ? tl.load(r.atmosphere.alpha) : undefined, transparent: true, depthWrite: false, roughness: 1.0, metalness: 0.0 });
       clouds = new Mesh(cloudsGeo, mat);
       cloudSpin = r.atmosphere.spinSpeed ?? 0.02;
-      group.add(clouds);
+      // Parent clouds under the planet mesh so they inherit daily spin;
+      // drift is applied by CloudsSystem on top of that.
+      mesh.add(clouds);
     }
 
     inst = { group, mesh, baseQuat: qBase, spinAxis: axisVec.clone(), rings, clouds, cloudSpin };
@@ -169,10 +171,8 @@ export class RenderSystem {
       inst.group.position.set(t.x, t.y, inst.group.position.z);
       const qSpin = new Quaternion().setFromAxisAngle(axis, o.angle);
       inst.mesh.quaternion.multiplyQuaternions(qSpin, inst.baseQuat);
-      if (inst.clouds && inst.cloudSpin) {
-        // CloudsSystem handles drift; here ensure clouds share base orientation
-        inst.clouds.quaternion.copy(inst.baseQuat);
-      }
+      // Do not override clouds quaternion here; clouds inherit mesh rotation and
+      // CloudsSystem adds gentle drift around local +Y.
     }
     // GC any instances that no longer have required components
     for (const [eid, inst] of this.map.entries()) {
