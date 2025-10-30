@@ -273,50 +273,37 @@ function bootstrap() {
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
 
-  // Create entities from styledObjects
+  // Create entities from styledObjects using batch and spawnWith
   const idToEid = new Map<string, number>();
-  for (const obj of styledObjects) {
-    const e = world.spawn();
-    idToEid.set(obj.id, e);
-    // Transform + Orientation + Style
-    world.attach(e, CTransform, { x: 0, y: 0 });
-    // Rotation axis from tilt
-    let axis = { x: 0, y: 0, z: 1 };
-    const rotAnim = (obj.animations ?? []).find(a => a.type === 'rotate');
-    if (rotAnim) axis = { x: rotAnim.axis.x, y: rotAnim.axis.y, z: rotAnim.axis.z };
-    world.attach(e, COrientation, { axis, angle: 0 });
-    // Rotation spin
-    const spinSpeed = (rotAnim?.speed ?? 0) * Math.PI * 2; // rot/sec → rad/s
-    world.attach(e, CRotation, { axis, spinRate: spinSpeed, angle: 0 });
-    // Orbit (if parent)
-    if (obj.parent) {
+  world.batch(() => {
+    for (const obj of styledObjects) {
+      // Rotation axis from tilt
+      let axis = { x: 0, y: 0, z: 1 };
+      const rotAnim = (obj.animations ?? []).find(a => a.type === 'rotate');
+      if (rotAnim) axis = { x: rotAnim.axis.x, y: rotAnim.axis.y, z: rotAnim.axis.z };
+      const spinRate = (rotAnim?.speed ?? 0) * Math.PI * 2;
       const orbitAnim = (obj.animations ?? []).find(a => a.type === 'orbit');
       const radius = orbitAnim?.radius ?? 0;
       const angSpeed = (orbitAnim?.speed ?? 0) * Math.PI * 2;
-      world.attach(e, COrbit, { parentEid: NO_PARENT, radius, angularSpeed: angSpeed, angle: 0 });
-      world.attach(e, CParent, { parentEid: NO_PARENT });
-      // Heuristic: attach TidalLock if rotate and orbit speeds match (within small epsilon)
-      if (rotAnim && orbitAnim) {
-        const rotRps = rotAnim.speed ?? 0;
-        const orbRps = orbitAnim.speed ?? 0;
-        if (Math.abs(rotRps - orbRps) < 1e-6) {
-          world.attach(e, CTidalLock, {});
-        }
+      const size = obj.size ?? 1;
+      const material = obj.material as any;
+      const e = (world as any).spawnWith({
+        transform: { x: 0, y: 0 },
+        orientation: { axis, angle: 0 },
+        rotation: { axis, spinRate, angle: 0 },
+        orbit: obj.parent ? { parentEid: NO_PARENT, radius, angularSpeed: angSpeed, angle: 0 } : undefined,
+        parent: obj.parent ? { parentEid: NO_PARENT } : undefined,
+        renderable: { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow },
+        style: { mode: enableImph ? 'imphenzia' : 'realistic' },
+        trail: obj.trail ? { step: 20 / ENGINE_DEFAULTS.viewport.zoom.initial, cap: 300, lines: [] } : undefined
+      });
+      idToEid.set(obj.id, e);
+      // Heuristic tidal lock
+      if (rotAnim && orbitAnim && obj.parent && Math.abs((rotAnim.speed ?? 0) - (orbitAnim.speed ?? 0)) < 1e-6) {
+        world.attach(e, CTidalLock, {});
       }
     }
-    // Renderable
-    const size = obj.size ?? 1;
-    const material = obj.material as any;
-    world.attach(e, CRenderable, { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow });
-    // Attach default style
-    world.attach(e, CEStyle, { mode: enableImph ? 'imphenzia' : 'realistic' });
-    // Trail component for ECS-managed trails
-    if (obj.trail) {
-      const step = 20 / (ENGINE_DEFAULTS.viewport.zoom.initial);
-      const cap = 300;
-      world.attach(e, CETrail, { step, cap, lines: [] });
-    }
-  }
+  });
   // Resolve parents
   for (const obj of styledObjects) {
     if (!obj.parent) continue;

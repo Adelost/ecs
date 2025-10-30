@@ -21,6 +21,7 @@ export class World {
   private stores: ComponentStore = new Map();
   private systems: { fn: SystemFn; phase: Phase; name: string }[] = [];
   private t = 0;
+  private frame = 0;
   private resources = new Map<string | symbol, any>();
   // Observers
   private onAttachMap = new Map<ComponentKey<any>, Set<(e: Eid) => void>>();
@@ -44,7 +45,7 @@ export class World {
     if (!rec) { rec = { store: new Map(), version: 0 }; this.stores.set(key, rec); }
     rec.store.set(e, data);
     rec.version++;
-    const obs = this.onAttachMap.get(key); if (obs) obs.forEach(fn => fn(e));
+    this.emitObs(this.onAttachMap, key, e);
   }
   get<T>(e: Eid, key: ComponentKey<T>): T | undefined {
     const rec = this.stores.get(key);
@@ -55,7 +56,7 @@ export class World {
     const rec = this.stores.get(key);
     if (rec && rec.store.delete(e)) {
       rec.version++;
-      const obs = this.onDetachMap.get(key); if (obs) obs.forEach(fn => fn(e));
+      this.emitObs(this.onDetachMap, key, e);
     }
   }
   mutate<T>(e: Eid, key: ComponentKey<T>, fn: (data: T) => void) {
@@ -63,12 +64,12 @@ export class World {
     const v = rec.store.get(e); if (v === undefined) return;
     fn(v);
     rec.version++;
-    const obs = this.onChangeMap.get(key); if (obs) obs.forEach(fn => fn(e));
+    this.emitObs(this.onChangeMap, key, e);
   }
   touch(e: Eid, key: ComponentKey<any>) {
     const rec = this.stores.get(key); if (!rec) return;
     rec.version++;
-    const obs = this.onChangeMap.get(key); if (obs) obs.forEach(fn => fn(e));
+    this.emitObs(this.onChangeMap, key, e);
   }
 
   // Queries (simple; for performance we can add caching later)
@@ -103,9 +104,16 @@ export class World {
     const getVersions = () => comps.map(c => this.stores.get(c)?.version ?? 0).join('|');
     let ver = '';
     let data: any[] = [];
+    let lastFrame = -1;
+    let rebuildsInFrame = 0;
     const getter = () => {
       const now = getVersions();
       if (now !== ver) { ver = now; data = this.query(...comps); }
+      // Watchdog: warn if we rebuild same query too many times in the same frame
+      if (this.frame === lastFrame) rebuildsInFrame++; else { lastFrame = this.frame; rebuildsInFrame = 1; }
+      if (rebuildsInFrame > 3) {
+        console.warn('[ECS] Cached query rebuilt', rebuildsInFrame, 'times in one frame for comps:', comps.map(c=>String(c)).join(','));
+      }
       return data;
     };
     this.cachedQueries.push({ comps, get: getter });
@@ -136,6 +144,7 @@ export class World {
         }
       }
     };
+    this.frame++;
     run('early');
     run('update');
     run('late');
@@ -152,6 +161,28 @@ export class World {
     let set = map.get(key); if (!set) { set = new Set(); map.set(key, set); }
     set.add(fn);
     return () => set!.delete(fn);
+  }
+
+  // Batching: defer observer firing during bulk changes
+  private batchDepth = 0;
+  private pendingObs: Array<{ map: Map<ComponentKey<any>, Set<(e: Eid) => void>>; key: ComponentKey<any>; eid: Eid }> = [];
+  batch(fn: () => void) {
+    this.batchDepth++;
+    try { fn(); } finally {
+      this.batchDepth--;
+      if (this.batchDepth === 0) {
+        const events = this.pendingObs.slice();
+        this.pendingObs.length = 0;
+        for (const ev of events) {
+          const set = ev.map.get(ev.key); if (!set) continue;
+          set.forEach(cb => cb(ev.eid));
+        }
+      }
+    }
+  }
+  private emitObs(map: Map<ComponentKey<any>, Set<(e: Eid) => void>>, key: ComponentKey<any>, eid: Eid) {
+    if (this.batchDepth > 0) { this.pendingObs.push({ map, key, eid }); return; }
+    const set = map.get(key); if (!set) return; set.forEach(cb => cb(eid));
   }
 
   // Profiler
