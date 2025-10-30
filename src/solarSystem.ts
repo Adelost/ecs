@@ -2,6 +2,7 @@ import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
 import { World } from './ecs/world';
 import { ENGINE_DEFAULTS } from './types';
+import { Style as CEStyle } from './ecs/components';
 import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock, Trail as CETrail } from './ecs/components';
 import { OrbitSystem } from './ecs/systems/orbit';
 import { RotationSystem } from './ecs/systems/rotation';
@@ -11,6 +12,7 @@ import { RingsSystem } from './ecs/systems/rings';
 import { CloudsSystem } from './ecs/systems/clouds';
 import { TrailSystem } from './ecs/systems/trail';
 import { LabelSystem } from './ecs/systems/label';
+import { MaterialSystem } from './ecs/systems/material';
 // Stylized mode (no ephemerides): we use our animation system
 
 // Time configuration
@@ -266,6 +268,7 @@ function bootstrap() {
   world.system((dt,t,w)=>RingsSystem(dt,t,w), 'update', 'Rings');
   world.system((dt,t,w)=>CloudsSystem(dt,t,w), 'update', 'Clouds');
   world.system((dt,t,w)=>TrailSystem(dt,t,w), 'update', 'Trail');
+  world.system((dt,t,w)=>MaterialSystem(dt,t,w), 'late', 'Material');
   world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
@@ -275,7 +278,7 @@ function bootstrap() {
   for (const obj of styledObjects) {
     const e = world.spawn();
     idToEid.set(obj.id, e);
-    // Transform + Orientation
+    // Transform + Orientation + Style
     world.attach(e, CTransform, { x: 0, y: 0 });
     // Rotation axis from tilt
     let axis = { x: 0, y: 0, z: 1 };
@@ -305,6 +308,8 @@ function bootstrap() {
     const size = obj.size ?? 1;
     const material = obj.material as any;
     world.attach(e, CRenderable, { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow });
+    // Attach default style
+    world.attach(e, CEStyle, { mode: enableImph ? 'imphenzia' : 'realistic' });
     // Trail component for ECS-managed trails
     if (obj.trail) {
       const step = 20 / (ENGINE_DEFAULTS.viewport.zoom.initial);
@@ -510,11 +515,16 @@ function setupSpeedUI() {
   styleWrap.appendChild(styleLabel);
   wrap.appendChild(styleWrap);
 
-  styleCheckbox.addEventListener('change', () => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('style', styleCheckbox.checked ? 'imph' : 'realistic');
-    const url = `${window.location.pathname}?${params.toString()}`;
-    window.location.replace(url);
+  styleCheckbox.addEventListener('change', async () => {
+    const mode = styleCheckbox.checked ? 'imphenzia' : 'realistic';
+    // Update all Style components at runtime (no reload)
+    const { Style: CEStyle } = (await import('./ecs/components')) as any;
+    // Brutal but simple: iterate all Renderable entities and set Style
+    // We access world via closure
+    const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>;
+    for (const [eid] of entries) {
+      (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = mode; });
+    }
   });
 
   // Initialize: set slider to default 1 day / 2 seconds and update
