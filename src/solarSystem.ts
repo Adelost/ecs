@@ -1,6 +1,8 @@
 import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
 import { World, NO_PARENT } from './ecs/world';
+// Ensure World.prototype.spawnWith is registered
+import './ecs/extensions';
 import { ENGINE_DEFAULTS } from './types';
 import { Style as CEStyle } from './ecs/components';
 import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock, Trail as CETrail } from './ecs/components';
@@ -502,10 +504,9 @@ function setupSpeedUI() {
   styleWrap.appendChild(styleLabel);
   wrap.appendChild(styleWrap);
 
-  styleCheckbox.addEventListener('change', async () => {
+  styleCheckbox.addEventListener('change', () => {
     const mode = styleCheckbox.checked ? 'imphenzia' : 'realistic';
     // Update all Style components at runtime (no reload)
-    const { Style: CEStyle } = (await import('./ecs/components')) as any;
     // Brutal but simple: iterate all Renderable entities and set Style
     // We access world via closure
     const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>;
