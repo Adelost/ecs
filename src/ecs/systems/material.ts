@@ -1,6 +1,6 @@
 import { World } from '../world';
 import { Renderable, Orientation, Style } from '../components';
-import { Color, Float32BufferAttribute, Mesh, MeshBasicMaterial, MeshPhongMaterial, MeshStandardMaterial, TextureLoader, Vector3 } from 'three';
+import { Color, Float32BufferAttribute, Mesh, MeshBasicMaterial, MeshPhongMaterial, MeshStandardMaterial, TextureLoader, Vector3, Quaternion } from 'three';
 import { MATERIAL_PALETTE } from '../../palettes';
 
 function toNonIndexed(mesh: Mesh) {
@@ -16,12 +16,14 @@ function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_
   const count = pos.count; if ((count % 3) !== 0) return;
   const colors = new Float32Array(count * 3);
   const north = axis.clone().normalize();
+  const qBase = new Quaternion().setFromUnitVectors(new Vector3(0,1,0), north);
   for (let i = 0; i < count; i += 3) {
     const cx = (pos.getX(i+0) + pos.getX(i+1) + pos.getX(i+2)) / 3;
     const cy = (pos.getY(i+0) + pos.getY(i+1) + pos.getY(i+2)) / 3;
     const cz = (pos.getZ(i+0) + pos.getZ(i+1) + pos.getZ(i+2)) / 3;
-    const unit = new Vector3(cx, cy, cz).normalize();
-    const lat01 = 0.5 * (north.dot(unit) + 1);
+    const unitLocal = new Vector3(cx, cy, cz).normalize();
+    const unitWorld = unitLocal.clone().applyQuaternion(qBase);
+    const lat01 = 0.5 * (north.dot(unitWorld) + 1);
     const step = Math.round(lat01 * Math.max(1, bands - 1)) / Math.max(1, bands - 1);
     const idx = Math.min(palette.length - 1, Math.floor(step * (palette.length - 1)));
     const [r,g,b] = hexToRgb(palette[idx]);
@@ -46,6 +48,7 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const colors = new Float32Array(count * 3);
     const north = axis.clone().normalize();
+    const qBase = new Quaternion().setFromUnitVectors(new Vector3(0,1,0), north);
     const ref = Math.abs(north.y) < 0.99 ? new Vector3(0,1,0) : new Vector3(1,0,0);
     const Uaxis = new Vector3().crossVectors(ref, north).normalize();
     const Vaxis = new Vector3().crossVectors(north, Uaxis).normalize();
@@ -53,11 +56,12 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
       const cx = (pos.getX(i+0)+pos.getX(i+1)+pos.getX(i+2))/3;
       const cy = (pos.getY(i+0)+pos.getY(i+1)+pos.getY(i+2))/3;
       const cz = (pos.getZ(i+0)+pos.getZ(i+1)+pos.getZ(i+2))/3;
-      const unit = new Vector3(cx,cy,cz).normalize();
-      const dotN = Math.max(-1, Math.min(1, unit.dot(north)));
+      const unitLocal = new Vector3(cx,cy,cz).normalize();
+      const unitWorld = unitLocal.clone().applyQuaternion(qBase);
+      const dotN = Math.max(-1, Math.min(1, unitWorld.dot(north)));
       const vSph = Math.acos(dotN) / Math.PI;
-      const uProjU = unit.dot(Uaxis);
-      const uProjV = unit.dot(Vaxis);
+      const uProjU = unitWorld.dot(Uaxis);
+      const uProjV = unitWorld.dot(Vaxis);
       const uAngle = Math.atan2(uProjV, uProjU);
       const uSph = (uAngle + Math.PI) / (2*Math.PI);
       const x = Math.min(canvas.width-1, Math.floor(((uSph%1+1)%1) * canvas.width));
