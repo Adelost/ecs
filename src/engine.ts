@@ -54,6 +54,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ENGINE_DEFAULTS, Layers, normalizePosition } from './types';
+import { updateRingsForHost } from './systems/rings';
+import { updateCloudsForHost } from './systems/clouds';
 
 // Debug toggles (off for production)
 const DEBUG_EQUATOR = false;
@@ -187,7 +189,9 @@ function applyPaletteVertexColors(geometry: BufferGeometry, cfg: PaletteMaterial
   const colors = new Float32Array(count * 3);
 
   const mode = cfg.mode ?? 'ndotL';
+  const lightingMode = (cfg.lighting ?? 'unlit') as 'unlit' | 'lit' | 'quantized';
   const light = new Vector3(cfg.lightDir?.x ?? 0, cfg.lightDir?.y ?? 0, cfg.lightDir?.z ?? 1).normalize();
+  // 'north' (spin axis): default to +Z (untilted axis), matching rotation axis when tilt=0.
   const north = new Vector3(cfg.axis?.x ?? 0, cfg.axis?.y ?? 0, cfg.axis?.z ?? 1).normalize();
   const palette = (cfg.palette && cfg.palette.length > 0)
     ? cfg.palette
@@ -274,15 +278,27 @@ function applyPaletteVertexColors(geometry: BufferGeometry, cfg: PaletteMaterial
         const idx = lit ? Math.floor(earthLand.length / 2) : Math.min(earthLand.length - 1, Math.round(ndl * (earthLand.length - 1)));
         chosenHex = earthLand[idx];
       }
+    } else if (mode === 'latitude') {
+      // Quantize by latitude bands w.r.t spin axis ('north')
+      // north is provided via cfg.axis or derived upstream
+      const north = new Vector3(cfg.axis?.x ?? 0, cfg.axis?.y ?? 0, cfg.axis?.z ?? 1).normalize();
+      // lat01 in [0,1]: 1 at north pole, 0 at south pole
+      const lat01 = 0.5 * (north.dot(unit) + 1);
+      const b = Math.max(1, bands - 1);
+      const step = Math.round(lat01 * b) / Math.max(1, b);
+      const idx = Math.min(palette.length - 1, Math.floor(step * (palette.length - 1)));
+      chosenHex = palette[idx];
     } else {
       // Quantize N·L against provided palette
       const ndl = 0.5 + 0.5 * Math.max(-1, Math.min(1, faceN.dot(light)));
       let idx: number;
-      if (lit) {
+      if (lightingMode === 'unlit') {
+        // Flat: pick a stable mid color
         idx = Math.floor(palette.length / 2);
       } else {
-        const step = Math.round(ndl * (bands - 1));
-        idx = Math.min(palette.length - 1, Math.floor(step * (palette.length / bands)));
+        // 'quantized' or 'lit': quantize into bands
+        const step = Math.round(ndl * Math.max(1, bands - 1));
+        idx = Math.min(palette.length - 1, Math.floor(step * (palette.length / Math.max(1, bands))));
       }
       chosenHex = palette[idx];
     }
@@ -331,8 +347,8 @@ function applyTexturePaletteVertexColors(geometry: BufferGeometry, image: HTMLIm
   const du = rect.u1 - rect.u0;
   const dv = rect.v1 - rect.v0;
   const clamp01 = (t: number) => t < 0 ? 0 : t > 1 ? 1 : t;
-  // Mapping axis: align texture's north to the planet's spin axis if provided, else +Y.
-  const north = new Vector3(cfg.axis?.x ?? 0, cfg.axis?.y ?? 1, cfg.axis?.z ?? 0).normalize();
+  // Mapping axis: world spin axis; default to +Z when not provided (untilted axis)
+  const north = new Vector3(cfg.axis?.x ?? 0, cfg.axis?.y ?? 0, cfg.axis?.z ?? 1).normalize();
   // Choose a stable reference not colinear with north to define longitude zero direction.
   const ref = Math.abs(north.y) < 0.99 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0);
   // Build tangent basis on equatorial plane: U around-equator axis, V 90° ahead.
@@ -514,8 +530,9 @@ function updateAnimation(state: AnimationState, dt: number, inst: { group: Group
 function createObjectSystem(
   scene: Scene,
   theme: Theme,
-  drawSegment: (x1: number, y1: number, x2: number, y2: number) => void,
-  textLayer: Group
+  drawSegment: (x1: number, y1: number, x2: number, y2: number) => Line,
+  textLayer: Group,
+  getZoom: () => number
 ) {
   type Instance = {
     id: string;
@@ -531,10 +548,11 @@ function createObjectSystem(
     controller?: (inst: Instance, t: number) => void;
     baseQuat?: Quaternion;
     spinAxis?: Vector3;
-    trail?: { last: Vector3 | null; acc: number; interval: number };
+    trail?: { last: Vector3 | null; acc: number; interval: number; lines?: Line[]; max?: number };
     ringsWorld?: Array<{ mesh: Mesh; qEq: Quaternion }>;
     ringsSpinRate?: number;
     ringsSpinAngle?: number;
+    cloudsWorld?: Array<{ mesh: Mesh; driftRate: number; driftAngle: number }>;
     update: (dt: number) => void;
     updateTheme: () => void;
   };
@@ -562,8 +580,9 @@ function createObjectSystem(
     if (!spec) return null;
     const size = objCfg.size ?? spec.defaultSize;
     let geometry = spec.create(size, objCfg);
-    // World-attached rings accumulator (set only for ringed spheres)
+    // Accumulators for child components to attach on instance
     let pendingRings: Array<{ mesh: Mesh; qEq: Quaternion }> | undefined;
+    let pendingClouds: Array<{ mesh: Mesh; driftRate: number; driftAngle: number }> | undefined;
 
     let material: MeshStandardMaterial | MeshBasicMaterial | MeshPhongMaterial;
     const matCfg = objCfg.material;
@@ -726,8 +745,11 @@ function createObjectSystem(
           metalness: 0.0
         });
         const clouds = new Mesh(cloudsGeo, cloudsMat);
-        clouds.quaternion.copy(baseQuat);
-        (clouds as any).__cloudSpin = objCfg.atmosphere.spinSpeed ?? 0.02; // rotations/sec
+        // Important: do NOT copy baseQuat to clouds. The planet mesh already has baseQuat,
+        // and clouds inherit the parent’s orientation. Copying baseQuat here would double-tilt.
+        // Register clouds for CloudSystem update (drift around local +Y)
+        if (!pendingClouds) pendingClouds = [];
+        pendingClouds.push({ mesh: clouds, driftRate: objCfg.atmosphere.spinSpeed ?? 0.02, driftAngle: 0 });
         mesh.add(clouds);
       }
 
@@ -780,33 +802,11 @@ function createObjectSystem(
       ringsWorld: (pendingRings && pendingRings.length) ? pendingRings : undefined,
       ringsSpinRate: objCfg.rings?.spin ?? 0,
       ringsSpinAngle: 0,
+      cloudsWorld: (pendingClouds && pendingClouds.length) ? pendingClouds : undefined,
       update: (dt: number) => {
         inst.animations.forEach(a => updateAnimation(a, dt, inst));
-        // Orient world-attached rings (tilt with axis, do not spin)
-        // (ring orientation moved to RingSystem in outer update)
-        // Spin clouds layer slightly if present
-        mesh.children.forEach(child => {
-          const s = (child as any).__cloudSpin as number | undefined;
-          if (s) {
-            child.rotateOnAxis(new Vector3(0,1,0), dt * s * Math.PI * 2);
-          }
-        });
-        if (inst.trail) {
-          inst.trail.acc += dt;
-          while (inst.trail.acc >= inst.trail.interval) {
-            const wp = new Vector3();
-            inst.group.getWorldPosition(wp);
-            if (!inst.trail.last) {
-              inst.trail.last = wp.clone();
-              inst.trail.acc -= inst.trail.interval;
-              continue;
-            }
-            const last = inst.trail.last;
-            drawSegment(last.x, last.y, wp.x, wp.y);
-            inst.trail.last.copy(wp);
-            inst.trail.acc -= inst.trail.interval;
-          }
-        }
+        // Rings and clouds handled by dedicated systems in outer update.
+        // Trail handled by TrailSystem (real-time throttled)
         if (inst.label) {
           const wp = new Vector3();
           inst.group.getWorldPosition(wp);
@@ -881,7 +881,7 @@ function createObjectSystem(
     
     if (objCfg.trail) {
       const interval = typeof objCfg.trail === 'object' && objCfg.trail.interval ? objCfg.trail.interval : 0.1;
-      inst.trail = { last: null, acc: 0, interval };
+      inst.trail = { last: null, acc: 0, interval, lines: [], max: 300 };
     }
 
     instances.push(inst);
@@ -890,7 +890,7 @@ function createObjectSystem(
   }
 
   let elapsed = 0;
-  function update(dt: number) {
+  function update(dt: number, realDt: number = dt) {
     elapsed += dt;
     // Core per-entity update
     instances.forEach(inst => {
@@ -898,20 +898,62 @@ function createObjectSystem(
       if (inst.controller) inst.controller(inst, elapsed);
     });
     // RingSystem: orient rings for all entities (tilt with axis, optional slow spin)
+    instances.forEach(inst => updateRingsForHost(inst as any, dt));
+    // CloudSystem: apply cloud drift (local +Y) for entities that have cloud layers
+    instances.forEach(inst => updateCloudsForHost(inst as any, dt));
+    // TrailSystem: draw segments every ~20px at STANDARD zoom (independent of time/speed and current zoom)
+    // Convert 20 px at standard zoom (ENGINE_DEFAULTS.viewport.zoom.initial) into a constant world step.
     instances.forEach(inst => {
-      if (!inst.ringsWorld || !inst.baseQuat) return;
-      // Accumulate ring spin angle independently of planet daily spin
-      const rate = inst.ringsSpinRate ?? 0;
-      inst.ringsSpinAngle = (inst.ringsSpinAngle ?? 0) + rate * dt * Math.PI * 2;
-      let qSpinWorld: Quaternion | null = null;
-      if (inst.ringsSpinAngle && inst.spinAxis) {
-        qSpinWorld = new Quaternion().setFromAxisAngle(inst.spinAxis.clone().normalize(), inst.ringsSpinAngle);
+      if (!inst.trail) return;
+      const wp = new Vector3();
+      inst.group.getWorldPosition(wp);
+      const trail: any = inst.trail as any;
+      if (!trail.last) { trail.last = wp.clone(); return; }
+      const last = trail.last as Vector3;
+      const step = 20 / ENGINE_DEFAULTS.viewport.zoom.initial; // constant world units for 20 px at standard zoom
+      let dx = wp.x - last.x;
+      let dy = wp.y - last.y;
+      let dist = Math.hypot(dx, dy);
+      if (dist < step) return;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      // add segments at fixed ~step spacing toward wp (leave remainder to accumulate next frame)
+      while (dist >= step) {
+        const nx = last.x + ux * step;
+        const ny = last.y + uy * step;
+        const seg = drawSegment(last.x, last.y, nx, ny);
+        if (trail.lines) {
+          trail.lines.push(seg);
+          const max = trail.max ?? 300;
+          while (trail.lines.length > max) {
+            const old = trail.lines.shift();
+            if (old) {
+              old.geometry.dispose();
+              (old.material as Material).dispose();
+              if (old.parent) old.parent.remove(old);
+            }
+          }
+          // Apply fade across the buffer so oldest is faint, newest is bright.
+          const len = trail.lines.length;
+          if (len > 0) {
+            const minAlpha = 0.08;
+            const maxAlpha = 0.95;
+            const gamma = 1.0; // adjust curve if needed
+            for (let i = 0; i < len; i++) {
+              const t = Math.pow((i + 1) / len, gamma); // oldest i=0 -> small, newest i=len-1 -> 1
+              const a = minAlpha + (maxAlpha - minAlpha) * t;
+              const m = trail.lines[i].material as LineBasicMaterial;
+              m.transparent = true;
+              m.opacity = a;
+              m.needsUpdate = true;
+            }
+          }
+        }
+        last.set(nx, ny, 0);
+        dx = wp.x - last.x;
+        dy = wp.y - last.y;
+        dist = Math.hypot(dx, dy);
       }
-      inst.ringsWorld.forEach(r => {
-        const baseEq = new Quaternion().multiplyQuaternions(inst.baseQuat as Quaternion, r.qEq);
-        if (qSpinWorld) r.mesh.quaternion.multiplyQuaternions(qSpinWorld, baseEq);
-        else r.mesh.quaternion.copy(baseEq);
-      });
     });
   }
 
@@ -963,6 +1005,16 @@ function createObjectSystem(
     const idx = instances.findIndex(i => i.id === id);
     if (idx === -1) return false;
     const inst = instances[idx];
+    // Dispose trail segments if any
+    if (inst.trail && (inst.trail as any).lines) {
+      const lines: Line[] = (inst.trail as any).lines;
+      lines.forEach(seg => {
+        seg.geometry.dispose();
+        (seg.material as Material).dispose();
+        if (seg.parent) seg.parent.remove(seg);
+      });
+      (inst.trail as any).lines = [];
+    }
     inst.mesh.geometry.dispose();
     (inst.mesh.material as Material).dispose();
     if (inst.glow) {
@@ -1135,7 +1187,13 @@ export function createEngine(config: EngineConfig): Engine {
     return { x: vec.x, y: vec.y };
   }
 
-  const objects = createObjectSystem(scene, theme, (x1, y1, x2, y2) => { addLine(x1, y1, x2, y2); }, layers.text);
+  const objects = createObjectSystem(
+    scene,
+    theme,
+    (x1, y1, x2, y2) => addLine(x1, y1, x2, y2),
+    layers.text,
+    () => getView().zoom
+  );
 
   function refreshTheme() {
     scene.background = new Color(theme.background);
@@ -1276,18 +1334,3 @@ function updateCursor(e?: PointerEvent) {
 
   return { renderer, composer, scene, camera, grid, objects, addTextLabel, render, setCanvasSize, setView, getView, dispose };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

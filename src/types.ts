@@ -57,8 +57,11 @@ export const Axis = {
 
 export type PaletteMaterial = {
   type: 'palette';
-  // Mode 'ndotL' quantizes N·L to palette; 'earth' assigns land/ocean/ice with simple procedural noise
-  mode?: 'ndotL' | 'earth';
+  // Modes:
+  // - 'ndotL': quantize bands by N·L shading
+  // - 'earth': procedural land/ocean/ice
+  // - 'latitude': quantize bands by absolute latitude (relative to axis)
+  mode?: 'ndotL' | 'earth' | 'latitude';
   // Lighting model: unlit = baked colors (MeshBasic), lit = use scene lights (MeshStandard), quantized = lit with banding (optional)
   lighting?: 'unlit' | 'lit' | 'quantized';
   // Optional custom palette (used in 'ndotL', ignored for 'earth' unless you want to override defaults)
