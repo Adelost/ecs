@@ -36,7 +36,8 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
   const pos = geom.getAttribute('position') as Float32BufferAttribute;
   const count = pos.count; if ((count % 3) !== 0) return;
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  // Hint to browsers that we will call getImageData frequently during baking
+  const ctx = canvas.getContext('2d', { willReadFrequently: true } as any) as CanvasRenderingContext2D;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
@@ -132,4 +133,3 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     }
   }
 }
-

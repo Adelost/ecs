@@ -30,7 +30,8 @@ export class RenderSystem {
     const size = 256;
     const canvas = document.createElement('canvas');
     canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
+    // Simple 2D glow; not readback-heavy, but set hint for consistency
+    const ctx = canvas.getContext('2d', { willReadFrequently: false } as any)!;
     const r = size / 2;
     const col = new Color(colorHex);
     const rgb = `rgba(${Math.round(col.r * 255)}, ${Math.round(col.g * 255)}, ${Math.round(col.b * 255)},`;
