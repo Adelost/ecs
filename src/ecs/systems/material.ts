@@ -185,7 +185,9 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     }
     const isGiant = ['jupiter','saturn','uranus','neptune'].some(n => id.includes(n));
     if (isGiant) {
-      bakeLatitude(inst.mesh, axis, 11, palette);
+      // For gas giants, always use curated stripe palettes to avoid rainbow artifacts.
+      const giantPalette = getPlanetPalette(id) || UNIVERSAL_PALETTE;
+      bakeLatitude(inst.mesh, axis, 11, giantPalette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
       (inst as any).currentStyle = 'imphenzia';
     } else if (r.material?.type === 'map' && r.material.map) {
