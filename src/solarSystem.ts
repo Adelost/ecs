@@ -273,6 +273,8 @@ function bootstrap() {
   world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
+  // Build UI now that world exists
+  setupSpeedUI(world);
 
   // Create entities from styledObjects using batch and spawnWith
   const idToEid = new Map<string, number>();
@@ -553,5 +555,3 @@ function setupSpeedUI(world: World) {
   slider.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`;
   applyScaleFromSlider();
 }
-  // Now that world exists, build UI (speed, style, profiler)
-  setupSpeedUI(world);
