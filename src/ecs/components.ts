@@ -1,0 +1,23 @@
+import { component } from './world';
+import type { Eid } from './world';
+
+export type Vec2 = { x: number; y: number };
+export type Vec3 = { x: number; y: number; z: number };
+
+// Core spatial
+export const Transform = component<{ x: number; y: number }>('Transform');
+export const Orientation = component<{ axis: Vec3; angle: number }>('Orientation');
+export const Parent = component<{ parent: Eid | null }>('Parent');
+
+// Motion
+export const Orbit = component<{ parent: Eid | null; radius: number; angularSpeed: number; angle: number }>('Orbit');
+export const Rotation = component<{ axis: Vec3; spinRate: number; angle: number }>('Rotation');
+export const TidalLock = component<{}>('TidalLock');
+
+// Visuals
+export type TextureMaterial = { type: 'map'; map: string; bump?: string; specular?: string; usePhong?: boolean; segments?: { width?: number; height?: number } };
+export type PaletteMat = { type: 'palette'; mode?: 'ndotL' | 'earth' | 'latitude'; lighting?: 'unlit' | 'lit' | 'quantized'; bands?: number; textureSrc?: string };
+export const Renderable = component<{ id: string; size: number; material: TextureMaterial | PaletteMat; label?: string; rings?: { texture?: string; inner?: number; outer?: number }; atmosphere?: { map?: string; alpha?: string; scale?: number; spinSpeed?: number }; trail?: boolean; glow?: { size?: number; intensity?: number; color?: string; light?: { color?: string; intensity?: number; distance?: number; decay?: number; shadow?: { mapSize?: number; near?: number; far?: number; bias?: number; normalBias?: number } } } }>('Renderable');
+
+// Style
+export const Style = component<{ mode: 'realistic' | 'imphenzia' }>('Style');

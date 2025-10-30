@@ -1,5 +1,10 @@
 import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
+import { World } from './ecs/world';
+import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent } from './ecs/components';
+import { OrbitSystem } from './ecs/systems/orbit';
+import { RotationSystem } from './ecs/systems/rotation';
+import { RenderSystem } from './ecs/systems/render';
 // Stylized mode (no ephemerides): we use our animation system
 
 // Time configuration
@@ -244,9 +249,51 @@ function bootstrap() {
   SOLAR_SYSTEM.lighting.forEach(light => { engine.objects.addLight(light); });
   const enableImph = isImphenziaDefault();
   const styledObjects = withStyle(SOLAR_SYSTEM.objects, enableImph);
-  styledObjects.forEach(config => { engine.objects.createObject(config); });
-  engine.objects.wireParenting(SOLAR_SYSTEM.objects);
-  engine.objects.attachAnimations(SOLAR_SYSTEM.objects);
+
+  // ECS world setup
+  const world = new World();
+  const renderSystem = new RenderSystem(engine);
+  // Register systems
+  world.system((dt,t,w)=>OrbitSystem(dt,t,w), 'update', 'Orbit');
+  world.system((dt,t,w)=>RotationSystem(dt,t,w), 'update', 'Rotation');
+  world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
+
+  // Create entities from styledObjects
+  const idToEid = new Map<string, number>();
+  for (const obj of styledObjects) {
+    const e = world.spawn();
+    idToEid.set(obj.id, e);
+    // Transform + Orientation
+    world.attach(e, CTransform, { x: 0, y: 0 });
+    // Rotation axis from tilt
+    let axis = { x: 0, y: 0, z: 1 };
+    const rotAnim = (obj.animations ?? []).find(a => a.type === 'rotate');
+    if (rotAnim) axis = { x: rotAnim.axis.x, y: rotAnim.axis.y, z: rotAnim.axis.z };
+    world.attach(e, COrientation, { axis, angle: 0 });
+    // Rotation spin
+    const spinSpeed = (rotAnim?.speed ?? 0) * Math.PI * 2; // rot/sec → rad/s
+    world.attach(e, CRotation, { axis, spinRate: spinSpeed, angle: 0 });
+    // Orbit (if parent)
+    if (obj.parent) {
+      const orbitAnim = (obj.animations ?? []).find(a => a.type === 'orbit');
+      const radius = orbitAnim?.radius ?? 0;
+      const angSpeed = (orbitAnim?.speed ?? 0) * Math.PI * 2;
+      world.attach(e, COrbit, { parent: null, radius, angularSpeed: angSpeed, angle: 0 });
+      world.attach(e, CParent, { parent: null });
+    }
+    // Renderable
+    const size = obj.size ?? 1;
+    const material = obj.material as any;
+    world.attach(e, CRenderable, { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow });
+  }
+  // Resolve parents
+  for (const obj of styledObjects) {
+    if (!obj.parent) continue;
+    const child = idToEid.get(obj.id)!;
+    const parent = idToEid.get(obj.parent)!;
+    const o = world.get(child, COrbit); if (o) o.parent = parent;
+    const p = world.get(child, CParent); if (p) p.parent = parent;
+  }
 
 
   window.addEventListener('resize', () => { engine.setCanvasSize(container.clientWidth, container.clientHeight); });
@@ -257,6 +304,9 @@ function bootstrap() {
     const dt = rawDt * SOLAR_SYSTEM.timeScale;
     lastTime = time;
     // Pass both dt (sim time) and rawDt (real time) so trail sampling can throttle by real-time seconds
+    // Step ECS (orbits/rotations), then update render system in 'late' phase
+    world.step(dt);
+    // Keep engine systems (rings/trails/labels) updating
     engine.objects.update(dt, rawDt);
     engine.render();
     requestAnimationFrame(animate);
