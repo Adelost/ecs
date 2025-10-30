@@ -13,7 +13,7 @@ export function TrailSystem(_dt: number, _t: number, w: World) {
     const inst = render.getInst(eid);
     if (!inst) continue;
     const wp = new Vector3();
-    inst.objRef.group.getWorldPosition(wp);
+    inst.group.getWorldPosition(wp);
     if (!trail.last) { trail.last = { x: wp.x, y: wp.y }; continue; }
     let dx = wp.x - trail.last.x;
     let dy = wp.y - trail.last.y;
