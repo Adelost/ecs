@@ -151,8 +151,8 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
   for (const [eid, r, o, s] of q()) {
     const inst = render.getInst(eid);
     if (!inst) continue;
-    const desired = s.mode;
-    if ((inst as any).currentStyle === desired) continue;
+    const styleKey = s.mode === 'imphenzia' ? `imphenzia:${s.paletteMode ?? 'planet'}` : 'realistic';
+    if ((inst as any).currentStyle === styleKey) continue;
     const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
     if (desired === 'realistic') {
       // Rebuild map material from Renderable
@@ -171,7 +171,7 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
       } else {
         inst.mesh.material = new MeshStandardMaterial({ color: 0x9e9e9e, flatShading: true, metalness: 0, roughness: 1 });
       }
-      (inst as any).currentStyle = 'realistic';
+      (inst as any).currentStyle = styleKey;
       continue;
     }
     // Imphenzia: choose latitude for gas giants, texture quant for others
@@ -189,18 +189,18 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
       const giantPalette = getPlanetPalette(id) || UNIVERSAL_PALETTE;
       bakeLatitude(inst.mesh, axis, 11, giantPalette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
-      (inst as any).currentStyle = 'imphenzia';
+      (inst as any).currentStyle = styleKey;
     } else if (r.material?.type === 'map' && r.material.map) {
       if (paletteMode === 'auto') {
         bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, null);
       } else {
         bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette as string[]);
       }
-      (inst as any).currentStyle = 'imphenzia';
+      (inst as any).currentStyle = styleKey;
     } else {
       bakeLatitude(inst.mesh, axis, 6, palette);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
-      (inst as any).currentStyle = 'imphenzia';
+      (inst as any).currentStyle = styleKey;
     }
   }
 }
