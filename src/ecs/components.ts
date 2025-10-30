@@ -26,3 +26,8 @@ export const Trail = component<{ step: number; cap: number; lines: any[]; last?:
 
 // Style
 export const Style = component<{ mode: 'realistic' | 'imphenzia'; paletteMode?: 'planet' | 'universal' | 'auto' }>('Style');
+
+// Baked vertex colors (Imphenzia): MaterialSystem computes; RenderSystem applies
+export const BakedVertexColors = component<{ colors: Float32Array }>('BakedVertexColors');
+// Tag to record what style key was applied to avoid redundant rebakes
+export const MaterialTag = component<{ appliedKey: string }>('MaterialTag');

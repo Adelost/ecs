@@ -1,10 +1,11 @@
 import { World } from '../world';
-import { Renderable, Orientation, Style } from '../components';
+import { Renderable, Orientation, Style, BakedVertexColors, MaterialTag } from '../components';
 import { Color, Float32BufferAttribute, Mesh, MeshBasicMaterial, MeshPhongMaterial, MeshStandardMaterial, TextureLoader, Vector3, Quaternion } from 'three';
 import { MATERIAL_PALETTE } from '../../palettes';
 
-function toNonIndexed(mesh: Mesh) {
-  if (mesh.geometry.index) mesh.geometry = mesh.geometry.toNonIndexed();
+function getNonIndexedPositions(mesh: Mesh) {
+  const geom = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+  return geom.getAttribute('position') as Float32BufferAttribute;
 }
 
 function hexToRgb(hex: string): [number, number, number] { const c = new Color(hex); return [c.r, c.g, c.b]; }
@@ -43,11 +44,9 @@ function nearestPaletteOKLab(r: number, g: number, b: number, palette: string[])
   return new Color(palette[best]);
 }
 
-function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_PALETTE) {
-  toNonIndexed(mesh);
-  const geom = mesh.geometry;
-  const pos = geom.getAttribute('position') as Float32BufferAttribute;
-  const count = pos.count; if ((count % 3) !== 0) return;
+function computeLatitudeColors(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_PALETTE): Float32Array {
+  const pos = getNonIndexedPositions(mesh);
+  const count = pos.count; if ((count % 3) !== 0) return new Float32Array(0);
   const colors = new Float32Array(count * 3);
   const north = axis.clone().normalize();
   const qBase = new Quaternion().setFromUnitVectors(new Vector3(0,1,0), north);
@@ -63,14 +62,12 @@ function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_
     const [r,g,b] = hexToRgb(palette[idx]);
     for (let k=0;k<3;k++){ colors[3*(i+k)+0]=r; colors[3*(i+k)+1]=g; colors[3*(i+k)+2]=b; }
   }
-  geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  return colors;
 }
 
-function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette: string[] | null = MATERIAL_PALETTE) {
-  toNonIndexed(mesh);
-  const geom = mesh.geometry;
-  const pos = geom.getAttribute('position') as Float32BufferAttribute;
-  const count = pos.count; if ((count % 3) !== 0) return;
+function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, bands = 6, palette: string[] | null = MATERIAL_PALETTE, onDone?: (colors: Float32Array)=>void) {
+  const pos = getNonIndexedPositions(mesh);
+  const count = pos.count; if ((count % 3) !== 0) { onDone && onDone(new Float32Array(0)); return; }
   const canvas = document.createElement('canvas');
   // Hint to browsers that we will call getImageData frequently during baking
   const ctx = canvas.getContext('2d', { willReadFrequently: true } as any) as CanvasRenderingContext2D;
@@ -133,10 +130,7 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
       const chosen = new Color(`#${bestHex}`);
       for (let k=0;k<3;k++){ colors[3*(i+k)+0]=chosen.r; colors[3*(i+k)+1]=chosen.g; colors[3*(i+k)+2]=chosen.b; }
     }
-    geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
-    // Switch mesh material to vertexColors
-    mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
-    (mesh.material as any).needsUpdate = true;
+    onDone && onDone(colors);
   };
   img.src = textureUrl;
 }
@@ -152,7 +146,8 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     const inst = render.getInst(eid);
     if (!inst) continue;
     const styleKey = s.mode === 'imphenzia' ? `imphenzia:${s.paletteMode ?? 'planet'}` : 'realistic';
-    if ((inst as any).currentStyle === styleKey) continue;
+    const tag = w.get(eid, MaterialTag as any) as { appliedKey: string } | undefined;
+    if (tag && tag.appliedKey === styleKey) continue;
     const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
     if (s.mode === 'realistic') {
       // Rebuild map material from Renderable
@@ -171,7 +166,9 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
       } else {
         inst.mesh.material = new MeshStandardMaterial({ color: 0x9e9e9e, flatShading: true, metalness: 0, roughness: 1 });
       }
-      (inst as any).currentStyle = styleKey;
+      // Remove baked colors if present
+      if (w.get(eid, BakedVertexColors as any)) { w.detach(eid, BakedVertexColors as any); }
+      if (tag) w.mutate(eid, MaterialTag as any, t => { (t as any).appliedKey = styleKey; }); else w.attach(eid, MaterialTag as any, { appliedKey: styleKey });
       continue;
     }
     // Imphenzia: choose latitude for gas giants, texture quant for others
@@ -185,22 +182,27 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
     }
     const isGiant = ['jupiter','saturn','uranus','neptune'].some(n => id.includes(n));
     if (isGiant) {
-      // For gas giants, always use curated stripe palettes to avoid rainbow artifacts.
       const giantPalette = getPlanetPalette(id) || UNIVERSAL_PALETTE;
-      bakeLatitude(inst.mesh, axis, 11, giantPalette);
-      inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
-      (inst as any).currentStyle = styleKey;
+      const colors = computeLatitudeColors(inst.mesh, axis, 11, giantPalette);
+      if (w.get(eid, BakedVertexColors as any)) w.mutate(eid, BakedVertexColors as any, (bv: any) => { bv.colors = colors; });
+      else w.attach(eid, BakedVertexColors as any, { colors });
+      if (tag) w.mutate(eid, MaterialTag as any, t => { (t as any).appliedKey = styleKey; }); else w.attach(eid, MaterialTag as any, { appliedKey: styleKey });
     } else if (r.material?.type === 'map' && r.material.map) {
+      const done = (colors: Float32Array) => {
+        if (w.get(eid, BakedVertexColors as any)) w.mutate(eid, BakedVertexColors as any, (bv: any) => { bv.colors = colors; });
+        else w.attach(eid, BakedVertexColors as any, { colors });
+        if (tag) w.mutate(eid, MaterialTag as any, t => { (t as any).appliedKey = styleKey; }); else w.attach(eid, MaterialTag as any, { appliedKey: styleKey });
+      };
       if (paletteMode === 'auto') {
-        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, null);
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, null, done);
       } else {
-        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette as string[]);
+        bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, palette as string[], done);
       }
-      (inst as any).currentStyle = styleKey;
     } else {
-      bakeLatitude(inst.mesh, axis, 6, palette);
-      inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
-      (inst as any).currentStyle = styleKey;
+      const colors = computeLatitudeColors(inst.mesh, axis, 6, palette as string[]);
+      if (w.get(eid, BakedVertexColors as any)) w.mutate(eid, BakedVertexColors as any, (bv: any) => { bv.colors = colors; });
+      else w.attach(eid, BakedVertexColors as any, { colors });
+      if (tag) w.mutate(eid, MaterialTag as any, t => { (t as any).appliedKey = styleKey; }); else w.attach(eid, MaterialTag as any, { appliedKey: styleKey });
     }
   }
 }

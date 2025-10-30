@@ -1,8 +1,8 @@
-import { Group, Mesh, Quaternion, Vector3, SphereGeometry, RingGeometry, MeshStandardMaterial, MeshPhongMaterial, TextureLoader, MeshBasicMaterial, Sprite, SpriteMaterial, CanvasTexture, Color, AdditiveBlending, PointLight, DoubleSide } from 'three';
+import { Group, Mesh, Quaternion, Vector3, SphereGeometry, RingGeometry, MeshStandardMaterial, MeshPhongMaterial, TextureLoader, MeshBasicMaterial, Sprite, SpriteMaterial, CanvasTexture, Color, AdditiveBlending, PointLight, DoubleSide, Float32BufferAttribute } from 'three';
 import type { Engine } from '../../engine';
 import { ENGINE_DEFAULTS } from '../../types';
 import { World } from '../world';
-import { Transform, Orientation, Renderable } from '../components';
+import { Transform, Orientation, Renderable, BakedVertexColors } from '../components';
 
 type RingInst = { mesh: Mesh; qEq: Quaternion };
 type Inst = { group: Group; mesh: Mesh; baseQuat: Quaternion; spinAxis: Vector3; rings?: RingInst[]; clouds?: Mesh; cloudSpin?: number; label?: Sprite };
@@ -174,6 +174,31 @@ export class RenderSystem {
       inst.mesh.quaternion.multiplyQuaternions(qSpin, inst.baseQuat);
       // Do not override clouds quaternion here; clouds inherit mesh rotation and
       // CloudsSystem adds gentle drift around local +Y.
+      // Apply baked vertex colors if present; else ensure map-based material
+      const baked = (w as any).get(e, BakedVertexColors as any) as { colors: Float32Array } | undefined;
+      if (baked && baked.colors && baked.colors.length > 0) {
+        if (inst.mesh.geometry.index || ((inst.mesh.geometry.getAttribute('position') as any).count * 3 !== baked.colors.length)) {
+          inst.mesh.geometry = inst.mesh.geometry.toNonIndexed();
+        }
+        (inst.mesh.geometry as any).setAttribute('color', new Float32BufferAttribute(baked.colors, 3));
+        inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
+      } else {
+        // If a color attribute exists from a previous bake, remove it and restore map material
+        if ((inst.mesh.geometry as any).getAttribute('color')) (inst.mesh.geometry as any).deleteAttribute('color');
+        const tl = new TextureLoader();
+        if (r.material?.type === 'map') {
+          if (r.material.usePhong || r.material.specular) {
+            const mat = new MeshPhongMaterial({ map: r.material.map ? tl.load(r.material.map) : undefined });
+            if (r.material.bump) { mat.bumpMap = tl.load(r.material.bump); (mat as any).bumpScale = 0.02; }
+            if (r.material.specular) { (mat as any).specularMap = tl.load(r.material.specular); }
+            inst.mesh.material = mat;
+          } else {
+            const mat = new MeshStandardMaterial({ map: r.material.map ? tl.load(r.material.map) : undefined, metalness: 0.0, roughness: 1.0 });
+            if (r.material.bump) { (mat as any).bumpMap = tl.load(r.material.bump); (mat as any).bumpScale = 0.02; }
+            inst.mesh.material = mat;
+          }
+        }
+      }
     }
     // GC any instances that no longer have required components
     for (const [eid, inst] of this.map.entries()) {
