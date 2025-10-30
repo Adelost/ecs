@@ -1,9 +1,10 @@
 import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
 import { World } from './ecs/world';
-import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent } from './ecs/components';
+import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock } from './ecs/components';
 import { OrbitSystem } from './ecs/systems/orbit';
 import { RotationSystem } from './ecs/systems/rotation';
+import { TidalLockSystem } from './ecs/systems/tidalLock';
 import { RenderSystem } from './ecs/systems/render';
 // Stylized mode (no ephemerides): we use our animation system
 
@@ -255,6 +256,7 @@ function bootstrap() {
   const renderSystem = new RenderSystem(engine);
   // Register systems
   world.system((dt,t,w)=>OrbitSystem(dt,t,w), 'update', 'Orbit');
+  world.system((dt,t,w)=>TidalLockSystem(dt,t,w), 'update', 'TidalLock');
   world.system((dt,t,w)=>RotationSystem(dt,t,w), 'update', 'Rotation');
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
 
@@ -280,6 +282,14 @@ function bootstrap() {
       const angSpeed = (orbitAnim?.speed ?? 0) * Math.PI * 2;
       world.attach(e, COrbit, { parent: null, radius, angularSpeed: angSpeed, angle: 0 });
       world.attach(e, CParent, { parent: null });
+      // Heuristic: attach TidalLock if rotate and orbit speeds match (within small epsilon)
+      if (rotAnim && orbitAnim) {
+        const rotRps = rotAnim.speed ?? 0;
+        const orbRps = orbitAnim.speed ?? 0;
+        if (Math.abs(rotRps - orbRps) < 1e-6) {
+          world.attach(e, CTidalLock, {});
+        }
+      }
     }
     // Renderable
     const size = obj.size ?? 1;
