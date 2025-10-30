@@ -112,6 +112,21 @@ export class RenderSystem {
       const inner = (r.rings.inner ?? 1.5) * (r.size / 2);
       const outer = Math.max(inner + (r.size * 0.12), (r.rings.outer ?? 2.8) * (r.size / 2));
       const geo = new RingGeometry(inner, outer, 256);
+      // Radial UV mapping: U from inner->outer, V = 0.5
+      const pos = geo.getAttribute('position');
+      const count = pos.count;
+      const data = new Float32Array(count * 2);
+      const rSpan = Math.max(1e-6, outer - inner);
+      for (let i = 0; i < count; i++) {
+        const x = (pos as any).getX(i);
+        const y = (pos as any).getY(i);
+        const rLen = Math.sqrt(x * x + y * y);
+        const u = (rLen - inner) / rSpan;
+        data[2 * i + 0] = Math.min(1, Math.max(0, u));
+        data[2 * i + 1] = 0.5;
+      }
+      if ((geo as any).getAttribute('uv')) (geo as any).deleteAttribute('uv');
+      (geo as any).setAttribute('uv', new (pos as any).constructor(data, 2));
       const baseMat = new MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8, side: DoubleSide, depthWrite: false });
       const baseRing = new Mesh(geo, baseMat);
       const qEq = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(0, 1, 0));
