@@ -1,0 +1,26 @@
+{
+  "name": "vite-three-orbitcube",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts",
+    "extract:planets": "node scripts/extract-planets.mjs"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.0",
+    "sharp": "^0.34.4",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "@types/three": "^0.180.0",
+    "eslint": "^9.38.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.46.2",
+    "vite": "^5.4.0"
+  }
+}
