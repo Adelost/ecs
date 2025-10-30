@@ -253,8 +253,7 @@ function bootstrap() {
   document.body.style.backgroundColor = theme.background;
   document.documentElement.style.backgroundColor = theme.background;
 
-  // Minimal speed UI with labeled marks and reverse toggle
-  setupSpeedUI();
+  // Minimal speed UI with labeled marks and reverse toggle (after world exists)
 
   SOLAR_SYSTEM.lighting.forEach(light => { engine.objects.addLight(light); });
   const enableImph = isImphenziaDefault();
@@ -336,7 +335,7 @@ function bootstrap() {
 
 bootstrap();
 
-function setupSpeedUI() {
+function setupSpeedUI(world: World) {
   const wrap = document.createElement('div');
   wrap.style.position = 'fixed';
   wrap.style.left = '12px';
@@ -557,3 +556,5 @@ function setupSpeedUI() {
   slider.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`;
   applyScaleFromSlider();
 }
+  // Now that world exists, build UI (speed, style, profiler)
+  setupSpeedUI(world);
