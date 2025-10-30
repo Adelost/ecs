@@ -71,6 +71,7 @@ export interface Engine {
   readonly grid: { snap(p: Vec2): Vec2 } | null;
   readonly objects: ReturnType<typeof createObjectSystem>;
   addTextLabel(text: string, position: Vec2, options?: { color?: string; fontSize?: number; fontFamily?: string; worldHeight?: number; padding?: number; background?: string; center?: boolean }): Sprite;
+  drawLine(x1: number, y1: number, x2: number, y2: number, color?: string, opacity?: number): Line;
   render(): void;
   setCanvasSize(width: number, height: number): void;
   setView(offset: Vec2, zoom?: number): void;
@@ -905,6 +906,7 @@ function createObjectSystem(
     // Convert 20 px at standard zoom (ENGINE_DEFAULTS.viewport.zoom.initial) into a constant world step.
     instances.forEach(inst => {
       if (!inst.trail) return;
+      if ((inst as any).ecsControlTrails) return;
       const wp = new Vector3();
       inst.group.getWorldPosition(wp);
       const trail: any = inst.trail as any;
@@ -1332,5 +1334,5 @@ function updateCursor(e?: PointerEvent) {
     config.container.removeChild(renderer.domElement);
   }
 
-  return { renderer, composer, scene, camera, grid, objects, addTextLabel, render, setCanvasSize, setView, getView, dispose };
+  return { renderer, composer, scene, camera, grid, objects, addTextLabel, drawLine: addLine, render, setCanvasSize, setView, getView, dispose };
 }

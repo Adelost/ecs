@@ -19,5 +19,8 @@ export type TextureMaterial = { type: 'map'; map: string; bump?: string; specula
 export type PaletteMat = { type: 'palette'; mode?: 'ndotL' | 'earth' | 'latitude'; lighting?: 'unlit' | 'lit' | 'quantized'; bands?: number; textureSrc?: string };
 export const Renderable = component<{ id: string; size: number; material: TextureMaterial | PaletteMat; label?: string; rings?: { texture?: string; inner?: number; outer?: number }; atmosphere?: { map?: string; alpha?: string; scale?: number; spinSpeed?: number }; trail?: boolean; glow?: { size?: number; intensity?: number; color?: string; light?: { color?: string; intensity?: number; distance?: number; decay?: number; shadow?: { mapSize?: number; near?: number; far?: number; bias?: number; normalBias?: number } } } }>('Renderable');
 
+// Trail data for ECS-managed trails
+export const Trail = component<{ step: number; cap: number; lines: any[]; last?: { x: number; y: number } }>('Trail');
+
 // Style
 export const Style = component<{ mode: 'realistic' | 'imphenzia' }>('Style');

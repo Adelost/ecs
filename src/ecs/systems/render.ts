@@ -11,6 +11,10 @@ export class RenderSystem {
 
   getInst(eid: number): Inst | undefined { return this.map.get(eid); }
 
+  drawLine(x1: number, y1: number, x2: number, y2: number) {
+    return this.engine.drawLine(x1, y1, x2, y2);
+  }
+
   private ensure(e: number, r: any, axisVec: Vector3): Inst {
     let inst = this.map.get(e);
     if (inst) return inst;

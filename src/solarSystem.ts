@@ -1,13 +1,15 @@
 import { createEngine } from './engine';
 import { Axis, type ObjectConfig, type LightConfig, type PaletteMaterial, type AtmosphereConfig, type RingsConfig } from './types';
 import { World } from './ecs/world';
-import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock } from './ecs/components';
+import { ENGINE_DEFAULTS } from './types';
+import { Transform as CTransform, Orientation as COrientation, Orbit as COrbit, Rotation as CRotation, Renderable as CRenderable, Parent as CParent, TidalLock as CTidalLock, Trail as CETrail } from './ecs/components';
 import { OrbitSystem } from './ecs/systems/orbit';
 import { RotationSystem } from './ecs/systems/rotation';
 import { TidalLockSystem } from './ecs/systems/tidalLock';
 import { RenderSystem } from './ecs/systems/render';
 import { RingsSystem } from './ecs/systems/rings';
 import { CloudsSystem } from './ecs/systems/clouds';
+import { TrailSystem } from './ecs/systems/trail';
 // Stylized mode (no ephemerides): we use our animation system
 
 // Time configuration
@@ -262,7 +264,8 @@ function bootstrap() {
   world.system((dt,t,w)=>RotationSystem(dt,t,w), 'update', 'Rotation');
   world.system((dt,t,w)=>RingsSystem(dt,t,w), 'update', 'Rings');
   world.system((dt,t,w)=>CloudsSystem(dt,t,w), 'update', 'Clouds');
-  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid) });
+  world.system((dt,t,w)=>TrailSystem(dt,t,w), 'update', 'Trail');
+  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2) });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
 
   // Create entities from styledObjects
@@ -300,6 +303,12 @@ function bootstrap() {
     const size = obj.size ?? 1;
     const material = obj.material as any;
     world.attach(e, CRenderable, { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow });
+    // Trail component for ECS-managed trails
+    if (obj.trail) {
+      const step = 20 / (ENGINE_DEFAULTS.viewport.zoom.initial);
+      const cap = 300;
+      world.attach(e, CETrail, { step, cap, lines: [] });
+    }
   }
   // Resolve parents
   for (const obj of styledObjects) {
