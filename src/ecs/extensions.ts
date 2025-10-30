@@ -12,7 +12,7 @@ declare module './world' {
       rotation: typeof Rotation extends infer _ ? any : never;
       renderable: typeof Renderable extends infer _ ? any : never;
       trail: typeof Trail extends infer _ ? any : never;
-      style: { mode: 'realistic' | 'imphenzia' };
+      style: typeof Style extends infer _ ? any : never;
     }>): number;
   }
 }
@@ -29,4 +29,3 @@ World.prototype.spawnWith = function (spec) {
   if (spec.style) this.attach(e, Style as any, spec.style);
   return e;
 };
-

@@ -25,9 +25,12 @@ export const Renderable = component<{ id: string; size: number; material: Textur
 export const Trail = component<{ step: number; cap: number; lines: any[]; last?: { x: number; y: number } }>('Trail');
 
 // Style
-export const Style = component<{ mode: 'realistic' | 'imphenzia'; paletteMode?: 'planet' | 'universal' | 'auto' }>('Style');
+// Visual style selector: 'auto' (palette-baked low-poly) or 'textured' (realistic maps)
+export const Style = component<{ mode: 'auto' | 'textured' }>('Style');
 
 // Baked vertex colors (Imphenzia): MaterialSystem computes; RenderSystem applies
 export const BakedVertexColors = component<{ colors: Float32Array }>('BakedVertexColors');
+// Clouds low-poly colors (auto mode)
+export const CloudBakedColors = component<{ colors: Float32Array; alpha: Float32Array }>('CloudBakedColors');
 // Tag to record what style key was applied to avoid redundant rebakes
 export const MaterialTag = component<{ appliedKey: string }>('MaterialTag');

@@ -184,50 +184,11 @@ const SOLAR_SYSTEM = {
 };
 
 // Style flag: default to Imphenzia (palette) look, allow override via ?style=realistic
-function isImphenziaDefault() {
-  const params = new URLSearchParams(window.location.search);
-  const style = (params.get('style') || '').toLowerCase();
-  if (style === 'realistic') return false;
-  if (style === 'imph' || style === 'imphenzia' || style === 'palette') return true;
-  return false; // default OFF until fully tuned
-}
-
-function mapToImphenziaMaterial(id: string, mat: any): PaletteMaterial | null {
-  // Sun and rings/cloud sprites: skip
-  if (id === 'sun') return null;
-  // Prefer quantized from existing texture to preserve recognizable features
-  let textureSrc: string | undefined;
-  if (mat && typeof mat === 'object' && (mat as any).type === 'map' && (mat as any).map) {
-    textureSrc = (mat as any).map as string;
-  }
-  // Gas giants: latitude bands (no textureSrc), higher band count
-  if (id === 'jupiter' || id === 'saturn' || id === 'uranus' || id === 'neptune') {
-    return {
-      type: 'palette',
-      mode: 'latitude',
-      lighting: 'quantized',
-      bands: 11
-    } as PaletteMaterial;
-  }
-  // Others: quantize from texture for recognizable features
-  return {
-    type: 'palette',
-    mode: 'ndotL',
-    lighting: 'quantized',
-    bands: 6,
-    ...(textureSrc ? { textureSrc } : {})
-  } as PaletteMaterial;
-}
+// Style flags removed; auto palette is always enabled
 
 function withStyle(objects: ObjectConfig[], imphenzia: boolean): ObjectConfig[] {
-  if (!imphenzia) return objects;
-  // Override map materials with palette materials for spheres (except sun).
-  return objects.map(o => {
-    if (o.type !== 'sphere') return o;
-    const m = mapToImphenziaMaterial(o.id, o.material);
-    if (!m) return o;
-    return { ...o, material: m } as ObjectConfig;
-  });
+  // ECS MaterialSystem handles Imphenzia style; do not override materials here.
+  return objects;
 }
 
 function bootstrap() {
@@ -256,8 +217,7 @@ function bootstrap() {
   // Minimal speed UI with labeled marks and reverse toggle (after world exists)
 
   SOLAR_SYSTEM.lighting.forEach(light => { engine.objects.addLight(light); });
-  const enableImph = isImphenziaDefault();
-  const styledObjects = withStyle(SOLAR_SYSTEM.objects, enableImph);
+  const styledObjects = SOLAR_SYSTEM.objects;
 
   // ECS world setup
   const world = new World();
@@ -269,9 +229,11 @@ function bootstrap() {
   world.system(RingsSystem, 'update', 'Rings');
   world.system(CloudsSystem, 'update', 'Clouds');
   world.system(TrailSystem, 'update', 'Trail');
-  world.system(MaterialSystem, 'late', 'Material');
-  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts) });
+  // Render first so geometry/detail changes are applied before material baking
+  world.setResource('render', { getInst: (eid: number)=> renderSystem.getInst(eid), drawLine: (x1:number,y1:number,x2:number,y2:number)=> renderSystem.drawLine(x1,y1,x2,y2), addTextLabel: (text:string,pos:any,opts?:any)=> engine.addTextLabel(text,pos,opts), setAutoSubdiv: (n:number)=> renderSystem.setAutoSubdiv(n), getAutoSubdiv: ()=> (renderSystem as any).icoSubdivisions });
   world.system((_dt,_t,w)=>{ renderSystem.update(w); }, 'late', 'Render');
+  // Then bake materials for the now-current geometry
+  world.system(MaterialSystem, 'late', 'Material');
   world.system((_dt,_t,w)=>{ LabelSystem(_dt,_t,w); }, 'late', 'Labels');
   // Build UI now that world exists
   setupSpeedUI(world);
@@ -297,7 +259,7 @@ function bootstrap() {
         orbit: obj.parent ? { parentEid: NO_PARENT, radius, angularSpeed: angSpeed, angle: 0 } : undefined,
         parent: obj.parent ? { parentEid: NO_PARENT } : undefined,
         renderable: { id: obj.id, size, material, label: (typeof obj.label === 'string' ? obj.label : undefined), rings: obj.rings as any, atmosphere: obj.atmosphere as any, trail: !!obj.trail, glow: (obj as any).glow },
-        style: { mode: enableImph ? 'imphenzia' : 'realistic' },
+        style: { mode: 'auto' },
         trail: obj.trail ? { step: 20 / ENGINE_DEFAULTS.viewport.zoom.initial, cap: 300, lines: [] } : undefined
       });
       idToEid.set(obj.id, e);
@@ -339,38 +301,154 @@ function setupSpeedUI(world: World) {
   wrap.style.position = 'fixed';
   wrap.style.left = '12px';
   wrap.style.bottom = '12px';
-  wrap.style.padding = '8px 10px';
-  wrap.style.background = 'rgba(0,0,0,0.35)';
-  wrap.style.borderRadius = '6px';
-  wrap.style.color = '#eee';
-  wrap.style.font = '12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  wrap.style.padding = '12px';
+  wrap.style.background = 'rgba(0,0,0,0.6)';
+  wrap.style.borderRadius = '8px';
+  wrap.style.color = '#fff';
+  wrap.style.font = '13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
   wrap.style.zIndex = '1000';
+  wrap.style.backdropFilter = 'blur(8px)';
+  wrap.style.minWidth = '240px';
 
-  const label = document.createElement('div');
-  label.textContent = 'Speed';
-  label.style.marginBottom = '6px';
+  // Header with label
+  const header = document.createElement('div');
+  header.style.marginBottom = '8px';
+  header.style.fontSize = '11px';
+  header.style.textTransform = 'uppercase';
+  header.style.letterSpacing = '0.5px';
+  header.style.opacity = '0.7';
+  header.textContent = 'Time Speed';
+
+  // Preset chips
+  const presetRow = document.createElement('div');
+  presetRow.style.display = 'flex';
+  presetRow.style.gap = '6px';
+  presetRow.style.marginBottom = '10px';
+  presetRow.style.flexWrap = 'wrap';
 
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.min = '0';
   slider.max = '1';
   slider.step = '0.001';
-  slider.style.width = '280px';
+  slider.style.width = '100%';
   slider.style.display = 'block';
+  slider.style.margin = '8px 0';
+  slider.style.cursor = 'pointer';
+  // CRITICAL: Set explicit height for proper track rendering
+  slider.style.height = '6px';
+  slider.style.padding = '0';
+  slider.style.boxSizing = 'border-box';
+
+  // Complete slider styles - all pseudo-elements needed for visibility
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    /* Base slider element */
+    input[type="range"] {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      outline: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    /* Webkit (Chrome/Safari/Edge) Track */
+    input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.6) !important;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    /* Webkit Thumb */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid rgba(0,0,0,0.3);
+      margin-top: -7px;
+      position: relative;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255,255,255,0.8);
+    }
+
+    /* Firefox Track */
+    input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.6) !important;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    /* Firefox Thumb */
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255,255,255,0.8);
+    }
+
+    /* Edge/IE Track (legacy) */
+    input[type="range"]::-ms-track {
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      border-color: transparent;
+      color: transparent;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-ms-fill-lower {
+      background: rgba(255,255,255,0.6);
+      border-radius: 3px;
+    }
+
+    input[type="range"]::-ms-fill-upper {
+      background: rgba(255,255,255,0.6);
+      border-radius: 3px;
+    }
+
+    input[type="range"]::-ms-thumb {
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-radius: 50%;
+      cursor: pointer;
+      margin-top: 0;
+    }
+  `;
+  document.head.appendChild(styleEl);
 
   const readout = document.createElement('div');
-  readout.style.marginTop = '4px';
-  readout.style.whiteSpace = 'pre';
+  readout.style.fontSize = '12px';
+  readout.style.opacity = '0.9';
+  readout.style.marginTop = '6px';
+  readout.style.textAlign = 'center';
 
-  const marks = document.createElement('div');
-  marks.style.position = 'relative';
-  marks.style.width = slider.style.width;
-  marks.style.height = '18px';
-  marks.style.marginTop = '4px';
-
-  wrap.appendChild(label);
+  wrap.appendChild(header);
+  wrap.appendChild(presetRow);
   wrap.appendChild(slider);
-  wrap.appendChild(marks);
   wrap.appendChild(readout);
   document.body.appendChild(wrap);
 
@@ -388,10 +466,16 @@ function setupSpeedUI(world: World) {
   function updateReadout(scaleAbs: number) {
     const signed = reverse ? -scaleAbs : scaleAbs;
     const daySec = REAL_SECONDS_PER_EARTH_DAY / scaleAbs;
-    const yearSec = EARTH_YEAR_SECONDS / scaleAbs;
-    const fmt = (s: number) => (s >= 60 ? (s/60).toFixed(1) + 'm' : s.toFixed(1) + 's');
-    const sign = reverse ? '-' : '';
-    readout.textContent = `Earth: day ${fmt(daySec)}  •  year ${fmt(yearSec)}  (${sign}×${scaleAbs.toFixed(3)})`;
+    const fmt = (s: number) => {
+      if (s >= 3600) return `${(s/3600).toFixed(1)}h`;
+      if (s >= 60) return `${(s/60).toFixed(1)}m`;
+      return `${s.toFixed(1)}s`;
+    };
+    if (reverse) {
+      readout.innerHTML = `<span style="color: #ff6b6b;">← REVERSE</span> • 1 day = ${fmt(daySec)}`;
+    } else {
+      readout.textContent = `1 day = ${fmt(daySec)}`;
+    }
     SOLAR_SYSTEM.timeScale = signed;
   }
 
@@ -420,154 +504,237 @@ function setupSpeedUI(world: World) {
 
   slider.addEventListener('input', applyScaleFromSlider);
 
-  // Preset marks
+  // Preset chips (minimal set)
   const presets: Array<{ label: string; scale: number } >= [
-    { label: 'real-time', scale: REALTIME_SCALE },
     { label: '1d/min', scale: REAL_SECONDS_PER_EARTH_DAY / 60 },
-    { label: '1d/2s',  scale: DAY_PER_2S_SCALE },
     { label: '1d/s',   scale: REAL_SECONDS_PER_EARTH_DAY / 1 },
     { label: '1y/min', scale: EARTH_YEAR_SECONDS / 60 },
-    { label: '1y/s',   scale: FAST_TIMESCALE },
   ];
 
-  function addMark(labelText: string, t: number, onClick: () => void) {
-    const tick = document.createElement('div');
-    tick.style.position = 'absolute';
-    tick.style.left = `${(t * 100).toFixed(2)}%`;
-    tick.style.top = '0';
-    tick.style.width = '0';
-    tick.style.height = '8px';
-    tick.style.borderLeft = '2px solid #bbb';
-    tick.style.transform = 'translateX(-1px)';
-
-    const lbl = document.createElement('div');
-    lbl.textContent = labelText;
-    lbl.style.position = 'absolute';
-    lbl.style.top = '8px';
-    lbl.style.transform = 'translateX(-50%)';
-    lbl.style.color = '#ddd';
-    lbl.style.cursor = 'pointer';
-    lbl.style.userSelect = 'none';
-    lbl.style.fontSize = '11px';
-    lbl.addEventListener('click', () => { onClick(); });
-
-    const holder = document.createElement('div');
-    holder.style.position = 'absolute';
-    holder.style.left = `${(t * 100).toFixed(2)}%`;
-    holder.style.width = '0';
-    holder.appendChild(tick);
-    holder.appendChild(lbl);
-    marks.appendChild(holder);
-  }
-
-  presets.forEach(p => {
-    const t = timescaleToSlider(p.scale);
-    addMark(p.label, t, () => {
+  function createChip(labelText: string, scale: number) {
+    const chip = document.createElement('button');
+    chip.textContent = labelText;
+    chip.style.padding = '4px 10px';
+    chip.style.border = '1px solid rgba(255,255,255,0.3)';
+    chip.style.borderRadius = '12px';
+    chip.style.background = 'rgba(255,255,255,0.1)';
+    chip.style.color = '#fff';
+    chip.style.cursor = 'pointer';
+    chip.style.fontSize = '11px';
+    chip.style.fontWeight = '500';
+    chip.style.transition = 'all 0.2s';
+    chip.style.userSelect = 'none';
+    chip.addEventListener('mouseenter', () => {
+      chip.style.background = 'rgba(255,255,255,0.2)';
+      chip.style.borderColor = 'rgba(255,255,255,0.5)';
+    });
+    chip.addEventListener('mouseleave', () => {
+      chip.style.background = 'rgba(255,255,255,0.1)';
+      chip.style.borderColor = 'rgba(255,255,255,0.3)';
+    });
+    chip.addEventListener('click', () => {
+      const t = timescaleToSlider(scale);
       slider.value = `${t}`;
       applyScaleFromSlider();
     });
-  });
+    return chip;
+  }
 
-  // Reverse toggle
-  const reverseBtn = document.createElement('button');
-  reverseBtn.textContent = 'Reverse time';
-  reverseBtn.style.marginTop = '6px';
-  reverseBtn.style.padding = '2px 6px';
-  reverseBtn.style.border = '1px solid #888';
-  reverseBtn.style.borderRadius = '4px';
-  reverseBtn.style.background = 'rgba(255,255,255,0.08)';
-  reverseBtn.style.color = '#eee';
-  reverseBtn.style.cursor = 'pointer';
-  reverseBtn.addEventListener('click', () => {
+  // Reverse toggle as chip (create without default click handler) - add FIRST
+  const reverseChip = document.createElement('button');
+  reverseChip.textContent = '← Reverse';
+  reverseChip.style.padding = '4px 10px';
+  reverseChip.style.border = '1px solid rgba(255,255,255,0.3)';
+  reverseChip.style.borderRadius = '12px';
+  reverseChip.style.background = 'rgba(255,255,255,0.1)';
+  reverseChip.style.color = '#fff';
+  reverseChip.style.cursor = 'pointer';
+  reverseChip.style.fontSize = '11px';
+  reverseChip.style.fontWeight = '500';
+  reverseChip.style.transition = 'all 0.2s';
+  reverseChip.style.userSelect = 'none';
+
+  reverseChip.addEventListener('mouseenter', () => {
+    if (!reverse) {
+      reverseChip.style.background = 'rgba(255,255,255,0.2)';
+      reverseChip.style.borderColor = 'rgba(255,255,255,0.5)';
+    }
+  });
+  reverseChip.addEventListener('mouseleave', () => {
+    if (!reverse) {
+      reverseChip.style.background = 'rgba(255,255,255,0.1)';
+      reverseChip.style.borderColor = 'rgba(255,255,255,0.3)';
+    }
+  });
+  reverseChip.addEventListener('click', (e) => {
+    e.stopPropagation();
     reverse = !reverse;
-    reverseBtn.style.background = reverse ? 'rgba(255,80,80,0.25)' : 'rgba(255,255,255,0.08)';
-    // Re-apply with same magnitude
+    if (reverse) {
+      reverseChip.style.background = 'rgba(255,107,107,0.4)';
+      reverseChip.style.borderColor = 'rgba(255,107,107,0.7)';
+      reverseChip.style.color = '#ffcccc';
+    } else {
+      reverseChip.style.background = 'rgba(255,255,255,0.1)';
+      reverseChip.style.borderColor = 'rgba(255,255,255,0.3)';
+      reverseChip.style.color = '#fff';
+    }
     const t = parseFloat(slider.value);
     const scaleAbs = sliderToTimescale(t);
     updateReadout(scaleAbs);
   });
-  wrap.appendChild(reverseBtn);
+  presetRow.appendChild(reverseChip);
 
-  // Style toggle (Imphenzia vs Realistic) – default ON
-  const styleWrap = document.createElement('div');
-  styleWrap.style.marginTop = '6px';
-  const styleLabel = document.createElement('label');
-  styleLabel.style.cursor = 'pointer';
-  const styleCheckbox = document.createElement('input');
-  styleCheckbox.type = 'checkbox';
-  styleCheckbox.checked = isImphenziaDefault();
-  styleCheckbox.style.marginRight = '6px';
-  styleLabel.appendChild(styleCheckbox);
-  styleLabel.appendChild(document.createTextNode('Imphenzia style'));
-  styleWrap.appendChild(styleLabel);
-  wrap.appendChild(styleWrap);
+  // Add speed presets after reverse
+  presets.forEach(p => {
+    presetRow.appendChild(createChip(p.label, p.scale));
+  });
 
-  styleCheckbox.addEventListener('change', () => {
-    const mode = styleCheckbox.checked ? 'imphenzia' : 'realistic';
-    // Update all Style components at runtime (no reload)
-    // Brutal but simple: iterate all Renderable entities and set Style
-    // We access world via closure
+  // Style toggle as divider
+  const divider = document.createElement('div');
+  divider.style.borderTop = '1px solid rgba(255,255,255,0.15)';
+  divider.style.margin = '10px 0 8px 0';
+  wrap.appendChild(divider);
+
+  const styleRow = document.createElement('div');
+  styleRow.style.display = 'flex';
+  styleRow.style.gap = '6px';
+  styleRow.style.alignItems = 'center';
+
+  const styleLabel = document.createElement('div');
+  styleLabel.textContent = 'Style:';
+  styleLabel.style.fontSize = '11px';
+  styleLabel.style.opacity = '0.7';
+  styleLabel.style.marginRight = '4px';
+
+  function mkStyleBtn(text: string) {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.style.padding = '4px 10px';
+    btn.style.border = '1px solid rgba(255,255,255,0.3)';
+    btn.style.borderRadius = '12px';
+    btn.style.background = 'rgba(255,255,255,0.1)';
+    btn.style.color = '#fff';
+    btn.style.cursor = 'pointer';
+    btn.style.fontSize = '11px';
+    btn.style.fontWeight = '500';
+    btn.style.transition = 'all 0.2s';
+    btn.style.userSelect = 'none';
+    btn.style.flex = '1';
+    return btn;
+  }
+
+  const texturedBtn = mkStyleBtn('Textured');
+  const autoBtn = mkStyleBtn('Low-poly');
+  // Default selected: Low-poly
+  autoBtn.style.background = 'rgba(29,185,84,0.3)';
+  autoBtn.style.borderColor = 'rgba(29,185,84,0.6)';
+
+  texturedBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    texturedBtn.style.background = 'rgba(29,185,84,0.3)';
+    texturedBtn.style.borderColor = 'rgba(29,185,84,0.6)';
+    autoBtn.style.background = 'rgba(255,255,255,0.1)';
+    autoBtn.style.borderColor = 'rgba(255,255,255,0.3)';
     const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>;
     for (const [eid] of entries) {
-      (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = mode; });
+      (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = 'textured'; });
     }
   });
 
-  // Palette mode selector
-  const palWrap = document.createElement('div');
-  palWrap.style.marginTop = '4px';
-  const palLabel = document.createElement('label');
-  palLabel.textContent = 'Palette:';
-  palLabel.style.marginRight = '6px';
-  const palSelect = document.createElement('select');
-  [['planet','Planet'], ['universal','Universal'], ['auto','Auto']].forEach(([val, text]) => {
-    const opt = document.createElement('option'); opt.value = val; opt.textContent = text; palSelect.appendChild(opt);
-  });
-  (palSelect as HTMLSelectElement).value = 'planet';
-  palWrap.appendChild(palLabel);
-  palWrap.appendChild(palSelect);
-  wrap.appendChild(palWrap);
-  palSelect.addEventListener('change', () => {
-    const val = (palSelect as HTMLSelectElement).value;
+  autoBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    autoBtn.style.background = 'rgba(29,185,84,0.3)';
+    autoBtn.style.borderColor = 'rgba(29,185,84,0.6)';
+    texturedBtn.style.background = 'rgba(255,255,255,0.1)';
+    texturedBtn.style.borderColor = 'rgba(255,255,255,0.3)';
     const entries = (world as any).query(CEStyle, CRenderable) as Array<[number, any, any]>;
     for (const [eid] of entries) {
-      (world as any).mutate(eid, CEStyle, (s: any) => { s.paletteMode = val; });
+      (world as any).mutate(eid, CEStyle, (s: any) => { s.mode = 'auto'; });
     }
   });
 
-  // Profiler overlay
-  const profWrap = document.createElement('div');
-  profWrap.style.marginTop = '6px';
-  const profLabel = document.createElement('label');
-  profLabel.style.cursor = 'pointer';
-  const profCheckbox = document.createElement('input');
-  profCheckbox.type = 'checkbox';
-  profCheckbox.style.marginRight = '6px';
-  profLabel.appendChild(profCheckbox);
-  profLabel.appendChild(document.createTextNode('Profiler'));
-  profWrap.appendChild(profLabel);
+  styleRow.appendChild(styleLabel);
+  styleRow.appendChild(texturedBtn);
+  styleRow.appendChild(autoBtn);
+  wrap.appendChild(styleRow);
+
+  // Detail slider (auto mode only): looks like the time slider
+  const detailHeader = document.createElement('div');
+  detailHeader.style.marginTop = '10px';
+  detailHeader.style.marginBottom = '6px';
+  detailHeader.style.fontSize = '11px';
+  detailHeader.style.textTransform = 'uppercase';
+  detailHeader.style.letterSpacing = '0.5px';
+  detailHeader.style.opacity = '0.7';
+  detailHeader.textContent = 'Detail';
+  const detailSlider = document.createElement('input');
+  detailSlider.type = 'range';
+  detailSlider.min = '0';
+  detailSlider.max = '20';
+  detailSlider.step = '1';
+  detailSlider.value = '4';
+  detailSlider.style.width = '100%';
+  detailSlider.style.display = 'block';
+  detailSlider.style.margin = '8px 0';
+  detailSlider.style.cursor = 'pointer';
+  const detailInfo = document.createElement('div');
+  detailInfo.style.fontSize = '11px';
+  detailInfo.style.opacity = '0.8';
+  detailInfo.style.textAlign = 'center';
+  detailInfo.style.marginTop = '4px';
+  function updateDetailInfo() {
+    const n = parseInt(detailSlider.value, 10);
+    // three@r169 IcosahedronGeometry detail grows ~quadratically:
+    // triangles ≈ 20 * (detail + 1)^2
+    const faces = 20 * (n + 1) * (n + 1);
+    const label = n === 0 ? 'Icosahedron' : `Subdiv ${n}`;
+    detailInfo.textContent = `${label} • triangles ${faces.toLocaleString()}`;
+  }
+  detailSlider.addEventListener('input', () => {
+    const n = parseInt(detailSlider.value, 10);
+    const res: any = (world as any).getResource('render');
+    if (res?.setAutoSubdiv) res.setAutoSubdiv(n);
+    updateDetailInfo();
+  });
+  wrap.appendChild(detailHeader);
+  wrap.appendChild(detailSlider);
+  wrap.appendChild(detailInfo);
+  updateDetailInfo();
+
+  // Profiler toggle
+  const profChip = createChip('⚡ Profiler', 0);
+  profChip.style.marginTop = '10px';
+  profChip.style.width = '100%';
   const profPanel = document.createElement('pre');
-  profPanel.style.margin = '4px 0 0 0';
-  profPanel.style.padding = '4px 6px';
-  profPanel.style.background = 'rgba(0,0,0,0.25)';
-  profPanel.style.borderRadius = '4px';
-  profPanel.style.maxHeight = '120px';
+  profPanel.style.margin = '6px 0 0 0';
+  profPanel.style.padding = '8px';
+  profPanel.style.background = 'rgba(0,0,0,0.4)';
+  profPanel.style.borderRadius = '6px';
+  profPanel.style.maxHeight = '140px';
   profPanel.style.overflow = 'auto';
   profPanel.style.display = 'none';
-  wrap.appendChild(profWrap);
+  profPanel.style.fontSize = '10px';
+  profPanel.style.lineHeight = '1.4';
+  profPanel.style.fontFamily = 'monospace';
+  wrap.appendChild(profChip);
   wrap.appendChild(profPanel);
+
+  let profEnabled = false;
   let profTimer: number | null = null;
   function refreshProfiler() {
     const rows = (world as any).getProfilerSnapshot() as Array<{ system: string; lastMs: number; avgMs: number }>;
-    const lines = rows.map(r => `${r.system.padEnd(12)} ${r.avgMs.toFixed(3)} ms (last ${r.lastMs.toFixed(3)})`);
-    profPanel.textContent = lines.join('\n') || 'No data yet...';
+    const lines = rows.map(r => `${r.system.padEnd(12)} ${r.avgMs.toFixed(2)}ms`);
+    profPanel.textContent = lines.join('\n') || 'No data...';
   }
-  profCheckbox.addEventListener('change', () => {
-    const on = profCheckbox.checked;
-    (world as any).enableProfiler(on);
-    profPanel.style.display = on ? 'block' : 'none';
+  profChip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    profEnabled = !profEnabled;
+    profChip.style.background = profEnabled ? 'rgba(252,211,77,0.3)' : 'rgba(255,255,255,0.1)';
+    profChip.style.borderColor = profEnabled ? 'rgba(252,211,77,0.6)' : 'rgba(255,255,255,0.3)';
+    (world as any).enableProfiler(profEnabled);
+    profPanel.style.display = profEnabled ? 'block' : 'none';
     if (profTimer) { clearInterval(profTimer); profTimer = null; }
-    if (on) {
+    if (profEnabled) {
       refreshProfiler();
       profTimer = window.setInterval(refreshProfiler, 1000) as unknown as number;
     }

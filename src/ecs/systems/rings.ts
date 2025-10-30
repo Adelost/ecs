@@ -4,7 +4,10 @@ import { Quaternion, Vector3 } from 'three';
 
 // Orient ring meshes in engine instances based on ECS Orientation/Renderable
 export function RingsSystem(dt: number, _t: number, w: World) {
-  const entries = w.query(Orientation, Renderable);
+  // Cached query for orientation + renderable rings
+  (RingsSystem as any)._q = (RingsSystem as any)._q || w.cached(Orientation, Renderable);
+  const q = (RingsSystem as any)._q as () => [number, any, any][];
+  const entries = q();
   for (const [e, o, r] of entries) {
     // Access engine instance via RenderSystem resource
     const render = w.getResource<{ getInst: (id: string) => any }>('render') as any;

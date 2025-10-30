@@ -7,7 +7,10 @@ import { ENGINE_DEFAULTS } from '../../types';
 export function TrailSystem(_dt: number, _t: number, w: World) {
   const render = w.getResource<{ getInst: (id: number) => any; drawLine: (x1:number,y1:number,x2:number,y2:number)=>any }>('render') as any;
   if (!render) return;
-  const entries = w.query(Trail, Renderable);
+  // Cached query for trail-bearing renderables
+  (TrailSystem as any)._q = (TrailSystem as any)._q || w.cached(Trail, Renderable);
+  const q = (TrailSystem as any)._q as () => [number, any, any][];
+  const entries = q();
   const step = 20 / ENGINE_DEFAULTS.viewport.zoom.initial;
   for (const [eid, trail, r] of entries) {
     const inst = render.getInst(eid);
