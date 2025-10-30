@@ -9,7 +9,7 @@ function toNonIndexed(mesh: Mesh) {
 
 function hexToRgb(hex: string): [number, number, number] { const c = new Color(hex); return [c.r, c.g, c.b]; }
 
-function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_PALETTE, opts?: { iceLat?: number; iceColor?: string }) {
+function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_PALETTE) {
   toNonIndexed(mesh);
   const geom = mesh.geometry;
   const pos = geom.getAttribute('position') as Float32BufferAttribute;
@@ -24,16 +24,9 @@ function bakeLatitude(mesh: Mesh, axis: Vector3, bands = 10, palette = MATERIAL_
     const unitLocal = new Vector3(cx, cy, cz).normalize();
     const unitWorld = unitLocal.clone().applyQuaternion(qBase);
     const lat01 = 0.5 * (north.dot(unitWorld) + 1);
-    const iceLat = opts?.iceLat ?? -1;
-    const isPolar = iceLat >= 0 && (lat01 >= iceLat || lat01 <= (1 - iceLat));
-    let r:number,g:number,b:number;
-    if (isPolar && opts?.iceColor) {
-      [r,g,b] = hexToRgb(opts.iceColor);
-    } else {
-      const step = Math.round(lat01 * Math.max(1, bands - 1)) / Math.max(1, bands - 1);
-      const idx = Math.min(palette.length - 1, Math.floor(step * (palette.length - 1)));
-      [r,g,b] = hexToRgb(palette[idx]);
-    }
+    const step = Math.round(lat01 * Math.max(1, bands - 1)) / Math.max(1, bands - 1);
+    const idx = Math.min(palette.length - 1, Math.floor(step * (palette.length - 1)));
+    const [r,g,b] = hexToRgb(palette[idx]);
     for (let k=0;k<3;k++){ colors[3*(i+k)+0]=r; colors[3*(i+k)+1]=g; colors[3*(i+k)+2]=b; }
   }
   geom.setAttribute('color', new Float32BufferAttribute(colors, 3));
@@ -74,19 +67,29 @@ function bakeTextureQuantized(mesh: Mesh, axis: Vector3, textureUrl: string, ban
       const uSph = (uAngle + Math.PI) / (2*Math.PI);
       const x = Math.min(canvas.width-1, Math.floor(((uSph%1+1)%1) * canvas.width));
       const y = Math.min(canvas.height-1, Math.floor(vSph * canvas.height));
-      // Polar override to avoid washed-out gray at caps
+      const data = ctx.getImageData(x, y, 1, 1).data;
+      // Polar override only if the sampled pixel is truly near white
       const iceLat = opts?.iceLat ?? -1;
       const isPolar = iceLat >= 0 && (lat01 >= iceLat || lat01 <= (1 - iceLat));
+      let usedOverride = false;
       if (isPolar && opts?.iceColor) {
-        const c2 = new Color(opts.iceColor);
-        for (let k=0;k<3;k++){ colors[3*(i+k)+0]=c2.r; colors[3*(i+k)+1]=c2.g; colors[3*(i+k)+2]=c2.b; }
-      } else {
-        const data = ctx.getImageData(x, y, 1, 1).data;
-        // Quantize by nearest palette color
+        const r = data[0]/255, g = data[1]/255, b = data[2]/255;
+        const maxc = Math.max(r,g,b), minc = Math.min(r,g,b);
+        const chroma = maxc - minc;                    // colorfulness
+        const luminance = 0.2126*r + 0.7152*g + 0.0722*b; // perceived brightness
+        if (luminance > 0.9 && chroma < 0.08) { // truly close to white
+          const c2 = new Color(opts.iceColor);
+          for (let k=0;k<3;k++){ colors[3*(i+k)+0]=c2.r; colors[3*(i+k)+1]=c2.g; colors[3*(i+k)+2]=c2.b; }
+          usedOverride = true;
+        }
+      }
+      if (!usedOverride) {
+        // Quantize to nearest palette color
         let bestIdx = 0, bestD = 1e9;
+        const rS = data[0]/255, gS = data[1]/255, bS = data[2]/255;
         for (let p=0;p<palette.length;p++){
           const c = new Color(palette[p]);
-          const dr = c.r - data[0]/255, dg = c.g - data[1]/255, db = c.b - data[2]/255;
+          const dr = c.r - rS, dg = c.g - gS, db = c.b - bS;
           const d = dr*dr + dg*dg + db*db;
           if (d < bestD){ bestD = d; bestIdx = p; }
         }
@@ -147,7 +150,7 @@ export function MaterialSystem(_dt: number, _t: number, w: World) {
       bakeTextureQuantized(inst.mesh, axis, r.material.map, 6, MATERIAL_PALETTE, ice);
       (inst as any).currentStyle = 'imphenzia';
     } else {
-      bakeLatitude(inst.mesh, axis, 6, MATERIAL_PALETTE, id.includes('earth') ? { iceLat: 0.78, iceColor: '#ffffff' } : undefined);
+      bakeLatitude(inst.mesh, axis, 6, MATERIAL_PALETTE);
       inst.mesh.material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0, roughness: 1 });
       (inst as any).currentStyle = 'imphenzia';
     }
