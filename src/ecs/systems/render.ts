@@ -1,5 +1,6 @@
-import { Group, Mesh, Quaternion, Vector3, SphereGeometry, RingGeometry, MeshStandardMaterial, MeshPhongMaterial, TextureLoader, MeshBasicMaterial, Sprite, SpriteMaterial, CanvasTexture, Color, AdditiveBlending, PointLight } from 'three';
-import type { Engine } from '../../src/engine';
+import { Group, Mesh, Quaternion, Vector3, SphereGeometry, RingGeometry, MeshStandardMaterial, MeshPhongMaterial, TextureLoader, MeshBasicMaterial, Sprite, SpriteMaterial, CanvasTexture, Color, AdditiveBlending, PointLight, DoubleSide } from 'three';
+import type { Engine } from '../../engine';
+import { ENGINE_DEFAULTS } from '../../types';
 import { World } from '../world';
 import { Transform, Orientation, Renderable } from '../components';
 
@@ -55,6 +56,8 @@ export class RenderSystem {
     const group = new Group();
     group.name = `ecs-${r.id}`;
     this.root!.add(group);
+    // Place geometry layer z for correct render ordering
+    group.position.z = ENGINE_DEFAULTS.layers.geometry.z;
     // Geometry and material
     const segW = r.material?.segments?.width ?? 48;
     const segH = r.material?.segments?.height ?? 24;
@@ -109,7 +112,7 @@ export class RenderSystem {
       const inner = (r.rings.inner ?? 1.5) * (r.size / 2);
       const outer = Math.max(inner + (r.size * 0.12), (r.rings.outer ?? 2.8) * (r.size / 2));
       const geo = new RingGeometry(inner, outer, 256);
-      const baseMat = new MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8 });
+      const baseMat = new MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8, side: DoubleSide, depthWrite: false });
       const baseRing = new Mesh(geo, baseMat);
       const qEq = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(0, 1, 0));
       // Inst ring orientation in RingsSystem; here just add to group
@@ -117,7 +120,7 @@ export class RenderSystem {
       rings = [{ mesh: baseRing, qEq }];
       if (r.rings.texture) {
         const tex = tl.load(r.rings.texture);
-        const ringMat = new MeshBasicMaterial({ map: tex, transparent: true });
+        const ringMat = new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide, depthWrite: false });
         const ring = new Mesh(geo, ringMat);
         group.add(ring);
         rings.push({ mesh: ring, qEq });
@@ -141,7 +144,9 @@ export class RenderSystem {
 
   update(w: World) {
     const entries = w.query(Transform, Orientation, Renderable);
+    const present = new Set<number>();
     for (const [e, t, o, r] of entries) {
+      present.add(e);
       const axis = new Vector3(o.axis.x, o.axis.y, o.axis.z).normalize();
       const inst = this.ensure(e, r, axis);
       inst.group.position.set(t.x, t.y, inst.group.position.z);
@@ -150,6 +155,21 @@ export class RenderSystem {
       if (inst.clouds && inst.cloudSpin) {
         // CloudsSystem handles drift; here ensure clouds share base orientation
         inst.clouds.quaternion.copy(inst.baseQuat);
+      }
+    }
+    // GC any instances that no longer have required components
+    for (const [eid, inst] of this.map.entries()) {
+      if (!present.has(eid)) {
+        if (inst.group.parent) inst.group.parent.remove(inst.group);
+        // Best-effort disposal
+        (inst.mesh.geometry as any)?.dispose?.();
+        const mat: any = inst.mesh.material as any;
+        if (mat?.map) mat.map.dispose?.();
+        mat?.dispose?.();
+        if (inst.rings) inst.rings.forEach(r => { (r.mesh.geometry as any)?.dispose?.(); (r.mesh.material as any)?.dispose?.(); r.mesh.parent && r.mesh.parent.remove(r.mesh); });
+        if (inst.clouds) { (inst.clouds.geometry as any)?.dispose?.(); (inst.clouds.material as any)?.dispose?.(); inst.clouds.parent && inst.clouds.parent.remove(inst.clouds); }
+        if (inst.label) { const m: any = inst.label.material; if (m?.map) m.map.dispose?.(); m?.dispose?.(); inst.label.parent && inst.label.parent.remove(inst.label); }
+        this.map.delete(eid);
       }
     }
   }
