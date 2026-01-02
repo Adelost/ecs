@@ -231,18 +231,20 @@ export class RenderSystem {
       }
       if ((geo as any).getAttribute('uv')) (geo as any).deleteAttribute('uv');
       (geo as any).setAttribute('uv', new (pos as any).constructor(data, 2));
-      const baseMat = new MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8, side: DoubleSide, depthWrite: false });
-      const baseRing = new Mesh(geo, baseMat);
       const qEq = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(0, 1, 0));
-      // Inst ring orientation in RingsSystem; here just add to group
-      group.add(baseRing);
-      rings = [{ mesh: baseRing, qEq }];
       if (r.rings.texture) {
+        // Textured ring with transparency
         const tex = tl.load(r.rings.texture);
         const ringMat = new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide, depthWrite: false });
         const ring = new Mesh(geo, ringMat);
         group.add(ring);
-        rings.push({ mesh: ring, qEq });
+        rings = [{ mesh: ring, qEq }];
+      } else {
+        // Fallback solid ring for stylized mode
+        const baseMat = new MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8, side: DoubleSide, depthWrite: false });
+        const baseRing = new Mesh(geo, baseMat);
+        group.add(baseRing);
+        rings = [{ mesh: baseRing, qEq }];
       }
     }
 
