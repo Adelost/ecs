@@ -283,9 +283,12 @@ function bootstrap() {
   world.step(0);
 
   // Center camera on Earth (at distance 10 from sun) with higher zoom
-  const view = engine.getView();
-  const earthX = 10;
-  engine.setView({ x: earthX - view.size.width / 2, y: -view.size.height / 2 }, 200);
+  const targetZoom = 200;
+  const canvas = engine.renderer.domElement;
+  const viewWidth = canvas.clientWidth / targetZoom;
+  const viewHeight = canvas.clientHeight / targetZoom;
+  const earthX = 10, earthY = 0;
+  engine.setView({ x: earthX - viewWidth / 2, y: earthY - viewHeight / 2 }, targetZoom);
 
   let lastTime = 0;
   function animate(time: number) {
