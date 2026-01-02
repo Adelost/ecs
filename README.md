@@ -1,25 +1,23 @@
-# ECS Solar System Demo
+# Solar System
 
-This project showcases a minimal ECS (Entity Component System) architecture, rendered with Three.js, featuring a stylized solar system.
+Interactive 3D solar system built with Three.js and a minimal ECS architecture.
 
-Highlights
-- Clean ECS world (`src/ecs/world.ts`) with cached queries and optional profiler
-- Systems: orbit, rotation, rings, clouds, material baking, labels, render
-- Imphenzia‑style palette baking and a realistic textured mode (toggle at runtime)
-- Engine utilities: grid, lines, labels, and a reusable UI toolkit
+**[Live Demo](https://adelost.github.io/ecs/)**
 
-Quick Start
-- npm i
-- npm run dev
+## Features
 
-Docs
-- UI Toolkit: docs/UI.md
-- Coordinates/Rotation: docs/COORDINATES_AND_ROTATION.md
-- Cross-reference writeup: docs/CROSS_REF.md
+- Accurate orbital mechanics and axial tilts
+- Two visual modes: stylized (Imphenzia-style) and realistic textures
+- Rings, clouds, and atmospheric effects
+- Real-time speed control
 
-UI Toolkit (engine.ui)
-- The engine exposes a reusable overlay UI manager for panels, sliders, buttons, chips (toggle), and a profiler.
-- See docs/UI.md for full API and usage examples.
+## Quick Start
 
-License
-- For internal/demo use. Do not redistribute textures without permission.
+```bash
+npm install
+npm run dev
+```
+
+## License
+
+MIT. Textures are from third-party sources - see `public/assets/CREDITS.md` for attribution.
