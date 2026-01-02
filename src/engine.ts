@@ -28,6 +28,7 @@ import {
   Object3D,
   Scene,
   SphereGeometry,
+  IcosahedronGeometry,
   Sprite,
   SpriteMaterial,
   CanvasTexture,
@@ -565,7 +566,7 @@ function createObjectSystem(
 
   const typeSpecs: Record<ObjectType, { defaultSize: number; create: (size: number, obj: ObjectConfig) => BufferGeometry } > = {
     box: { defaultSize: 1.5, create: (s) => new BoxGeometry(s, s, s) },
-    sphere: { defaultSize: 1.2, create: (s, obj) => { const ws = obj.segments?.width ?? 32; const hs = obj.segments?.height ?? 16; const g = new SphereGeometry(s / 2, ws, hs); return g; } },
+    sphere: { defaultSize: 1.2, create: (s, obj) => { const detail = obj.segments?.width ?? 8; const g = new IcosahedronGeometry(s / 2, detail); return g; } },
     cylinder: { defaultSize: 1.6, create: (s) => new CylinderGeometry(s / 2, s / 2, s, 8) },
     torus: { defaultSize: 1.8, create: (s) => new TorusGeometry(s / 3, s / 8, 8, 16) },
   };
@@ -739,7 +740,7 @@ function createObjectSystem(
       // Atmosphere/clouds layer if configured
       if (objCfg.atmosphere && (objCfg.atmosphere.map || objCfg.atmosphere.alpha)) {
         const loader = new TextureLoader();
-        const cloudsGeo = new SphereGeometry((size / 2) * (objCfg.atmosphere.scale ?? 1.03), objCfg.segments?.width ?? 32, objCfg.segments?.height ?? 16);
+        const cloudsGeo = new IcosahedronGeometry((size / 2) * (objCfg.atmosphere.scale ?? 1.03), objCfg.segments?.width ?? 8);
         const cloudsMat = new MeshStandardMaterial({
           map: objCfg.atmosphere.map ? loader.load(objCfg.atmosphere.map) : undefined,
           alphaMap: objCfg.atmosphere.alpha ? loader.load(objCfg.atmosphere.alpha) : undefined,
