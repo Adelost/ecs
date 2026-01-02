@@ -46,20 +46,31 @@ function ensureCSS() {
   _cssInjected = true;
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-  .ui-panel{position:fixed;padding:16px;background:${C.base}ee;border:1px solid ${C.surface1};border-radius:12px;color:${C.text};font:13px/1.5 'Inter',system-ui,-apple-system,sans-serif;backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,.4)}
-  .ui-header{margin:0 0 10px 0;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${C.subtext0}}
-  .ui-chip,.ui-button{padding:6px 14px;border:1px solid ${C.surface2};border-radius:8px;background:${C.surface0};color:${C.text};cursor:pointer;font-size:12px;font-weight:500;transition:all .15s ease;user-select:none}
+  .ui-panel{position:fixed;padding:16px;background:${C.base}ee;border:1px solid ${C.surface1};border-radius:12px;color:${C.text};font:14px/1.5 'Inter',system-ui,-apple-system,sans-serif;backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:320px}
+  .ui-header{margin:0 0 10px 0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${C.subtext0}}
+  .ui-chip,.ui-button{padding:10px 16px;border:1px solid ${C.surface2};border-radius:10px;background:${C.surface0};color:${C.text};cursor:pointer;font-size:14px;font-weight:500;transition:all .15s ease;user-select:none;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
   .ui-chip:hover,.ui-button:hover{background:${C.surface1};border-color:${C.overlay0}}
-  .ui-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .ui-divider{border:none;border-top:1px solid ${C.surface1};margin:12px 0}
-  .ui-readout{font-size:12px;color:${C.subtext1};margin-top:8px;text-align:center}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:${C.surface1};border-radius:2px;outline:none;padding:0;margin:10px 0;touch-action:none}
-  input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;background:${C.surface1};border-radius:2px;cursor:pointer}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;background:${C.text};border-radius:50%;cursor:pointer;border:none;margin-top:-8px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-  input[type=range]::-moz-range-track{width:100%;height:4px;background:${C.surface1};border-radius:2px;cursor:pointer}
-  input[type=range]::-moz-range-thumb{width:20px;height:20px;background:${C.text};border:none;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-  @media(pointer:coarse){input[type=range]::-webkit-slider-thumb{width:28px;height:28px;margin-top:-12px}input[type=range]::-moz-range-thumb{width:28px;height:28px}}
-  @media(max-width:480px){.ui-panel{left:8px!important;right:8px!important;bottom:8px!important;min-width:auto!important}}
+  .ui-chip:active,.ui-button:active{transform:scale(0.97)}
+  .ui-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ui-divider{border:none;border-top:1px solid ${C.surface1};margin:14px 0}
+  .ui-readout{font-size:13px;color:${C.subtext1};margin-top:10px;text-align:center}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;background:${C.surface1};border-radius:4px;outline:none;padding:0;margin:14px 0;touch-action:none}
+  input[type=range]::-webkit-slider-runnable-track{width:100%;height:8px;background:${C.surface1};border-radius:4px;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;background:${C.text};border-radius:50%;cursor:pointer;border:none;margin-top:-10px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-track{width:100%;height:8px;background:${C.surface1};border-radius:4px;cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:28px;height:28px;background:${C.text};border:none;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  @media(pointer:coarse){
+    input[type=range]::-webkit-slider-thumb{width:36px;height:36px;margin-top:-14px}
+    input[type=range]::-moz-range-thumb{width:36px;height:36px}
+    input[type=range]{height:10px;margin:18px 0}
+    .ui-chip,.ui-button{min-height:48px;padding:12px 20px;font-size:15px}
+  }
+  @media(max-width:480px){
+    .ui-panel{left:12px!important;right:12px!important;bottom:12px!important;min-width:auto!important;max-width:none;padding:20px}
+    .ui-chip,.ui-button{width:100%;justify-content:center}
+    .ui-row{flex-direction:column;gap:8px}
+    .ui-row .ui-chip,.ui-row .ui-button{width:100%}
+  }
   `;
   document.head.appendChild(styleEl);
 }
