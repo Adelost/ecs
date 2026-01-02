@@ -1307,7 +1307,7 @@ function updateCursor(e?: PointerEvent) {
     const ny = (e.clientY - rect.top) / rect.height;
     const nyInv = 1 - ny;
     const worldPt = { x: offset.x + nx * size.width, y: offset.y + nyInv * size.height };
-    const newSize = { width: renderer.getSize(new Vector2()).x / nextZoom, height: renderer.getSize(new Vector2()).y / nextZoom };
+    const newSize = { width: state.size.width / nextZoom, height: state.size.height / nextZoom };
     setView({ x: worldPt.x - nx * newSize.width, y: worldPt.y - nyInv * newSize.height }, nextZoom);
   };
   const onKeyDown = (e: KeyboardEvent) => {
@@ -1356,7 +1356,7 @@ function updateCursor(e?: PointerEvent) {
         const ny = (center.y - rect.top) / rect.height;
         const nyInv = 1 - ny;
         const worldPt = { x: offset.x + nx * size.width, y: offset.y + nyInv * size.height };
-        const newSize = { width: renderer.getSize(new Vector2()).x / nextZoom, height: renderer.getSize(new Vector2()).y / nextZoom };
+        const newSize = { width: state.size.width / nextZoom, height: state.size.height / nextZoom };
         setView({ x: worldPt.x - nx * newSize.width, y: worldPt.y - nyInv * newSize.height }, nextZoom);
       }
       lastPinchDist = dist;
