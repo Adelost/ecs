@@ -355,11 +355,6 @@ function setupControls(engine: ReturnType<typeof createEngine>, world: World) {
   function updateDetailInfo(){ const n = parseInt(detailSliderCtl.input.value, 10); const faces = 20 * (n + 1) * (n + 1); const label = n === 0 ? 'Icosahedron' : `Subdiv ${n}`; detailInfo.textContent = `${label} • triangles ${faces.toLocaleString()}`; }
   detailSliderCtl.input.addEventListener('input', ()=>{ const n = parseInt(detailSliderCtl.input.value, 10); const res:any = (world as any).getResource('render'); if (res?.setAutoSubdiv) res.setAutoSubdiv(n); updateDetailInfo(); }); updateDetailInfo();
 
-  panel.addProfiler(
-    () => ((world as any).getProfilerSnapshot() as Array<{ system: string; lastMs: number; avgMs: number }>).map(r => ({ system: r.system, avgMs: r.avgMs })),
-    (on: boolean) => { (world as any).enableProfiler(on); }
-  );
-
   sliderCtl.input.value = `${timescaleToSlider(DAY_PER_2S_SCALE)}`; applyScaleFromSlider();
 }
 
