@@ -206,7 +206,7 @@ function bootstrap() {
     container,
     theme,
     grid: { spacing: 2, extent: 128, normal: { opacity: 0.35, width: 0.02 }, major: { every: 10, width: 0.06, opacity: 0.9 } },
-    interactions: { enableDrawing: true, enableSelection: true, enablePan: true, enableZoom: true }
+    interactions: { enableDrawing: false, enableSelection: true, enablePan: true, enableZoom: true }
   });
 
   document.body.style.backgroundColor = theme.background;
