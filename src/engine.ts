@@ -1349,12 +1349,15 @@ function updateCursor(e?: PointerEvent) {
         const factor = dist / lastPinchDist;
         const { zoom, offset, size } = getView();
         const nextZoom = Math.max(ENGINE_DEFAULTS.viewport.zoom.min, Math.min(ENGINE_DEFAULTS.viewport.zoom.max, zoom * factor));
+        if (Math.abs(nextZoom - zoom) < 1e-4) { lastPinchDist = dist; return; }
         const rect = canvas.getBoundingClientRect();
+        // Match wheel zoom logic exactly
         const nx = (center.x - rect.left) / rect.width;
-        const ny = 1 - (center.y - rect.top) / rect.height;
-        const worldPt = { x: offset.x + nx * size.width, y: offset.y + ny * size.height };
+        const ny = (center.y - rect.top) / rect.height;
+        const nyInv = 1 - ny;
+        const worldPt = { x: offset.x + nx * size.width, y: offset.y + nyInv * size.height };
         const newSize = { width: renderer.getSize(new Vector2()).x / nextZoom, height: renderer.getSize(new Vector2()).y / nextZoom };
-        setView({ x: worldPt.x - nx * newSize.width, y: worldPt.y - ny * newSize.height }, nextZoom);
+        setView({ x: worldPt.x - nx * newSize.width, y: worldPt.y - nyInv * newSize.height }, nextZoom);
       }
       lastPinchDist = dist;
       lastPinchCenter = center;
