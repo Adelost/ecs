@@ -1317,11 +1317,66 @@ function updateCursor(e?: PointerEvent) {
   };
 
   const onContextMenu = (e: Event) => { e.preventDefault(); };
+
+  // Pinch-to-zoom support
+  let touches: Map<number, { x: number; y: number }> = new Map();
+  let lastPinchDist = 0;
+  let lastPinchCenter = { x: 0, y: 0 };
+
+  const onTouchStart = (e: TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      touches.set(t.identifier, { x: t.clientX, y: t.clientY });
+    }
+    if (touches.size === 2) {
+      const pts = Array.from(touches.values());
+      lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      lastPinchCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+    }
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      touches.set(t.identifier, { x: t.clientX, y: t.clientY });
+    }
+    if (touches.size === 2 && config.interactions?.enableZoom !== false) {
+      e.preventDefault();
+      const pts = Array.from(touches.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      if (lastPinchDist > 0) {
+        const factor = dist / lastPinchDist;
+        const { zoom, offset, size } = getView();
+        const nextZoom = Math.max(ENGINE_DEFAULTS.viewport.zoom.min, Math.min(ENGINE_DEFAULTS.viewport.zoom.max, zoom * factor));
+        const rect = canvas.getBoundingClientRect();
+        const nx = (center.x - rect.left) / rect.width;
+        const ny = 1 - (center.y - rect.top) / rect.height;
+        const worldPt = { x: offset.x + nx * size.width, y: offset.y + ny * size.height };
+        const newSize = { width: renderer.getSize(new Vector2()).x / nextZoom, height: renderer.getSize(new Vector2()).y / nextZoom };
+        setView({ x: worldPt.x - nx * newSize.width, y: worldPt.y - ny * newSize.height }, nextZoom);
+      }
+      lastPinchDist = dist;
+      lastPinchCenter = center;
+    }
+  };
+
+  const onTouchEnd = (e: TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      touches.delete(e.changedTouches[i].identifier);
+    }
+    if (touches.size < 2) { lastPinchDist = 0; }
+  };
+
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+  canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
   canvas.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('keydown', onKeyDown);
 
@@ -1332,6 +1387,10 @@ function updateCursor(e?: PointerEvent) {
     canvas.removeEventListener('pointerup', onPointerUp);
     canvas.removeEventListener('pointercancel', onPointerCancel);
     canvas.removeEventListener('wheel', onWheel);
+    canvas.removeEventListener('touchstart', onTouchStart);
+    canvas.removeEventListener('touchmove', onTouchMove);
+    canvas.removeEventListener('touchend', onTouchEnd);
+    canvas.removeEventListener('touchcancel', onTouchEnd);
     canvas.removeEventListener('contextmenu', onContextMenu);
     window.removeEventListener('keydown', onKeyDown);
     renderer.dispose();
