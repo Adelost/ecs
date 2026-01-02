@@ -36,11 +36,13 @@ function ensureCSS() {
   .ui-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .ui-divider{border-top:1px solid rgba(255,255,255,.15);margin:10px 0 8px 0}
   .ui-readout{font-size:12px;opacity:.9;margin-top:6px;text-align:center}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:transparent;outline:none;padding:0;margin:8px 0}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:transparent;outline:none;padding:0;margin:8px 0;touch-action:none}
   input[type=range]::-webkit-slider-runnable-track{width:100%;height:6px;background:rgba(255,255,255,.6)!important;border-radius:3px;cursor:pointer}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;background:#fff;border-radius:50%;cursor:pointer;border:2px solid rgba(0,0,0,.3);margin-top:-7px;position:relative}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;background:#fff;border-radius:50%;cursor:pointer;border:2px solid rgba(0,0,0,.3);margin-top:-11px;position:relative}
   input[type=range]::-moz-range-track{width:100%;height:6px;background:rgba(255,255,255,.6);border-radius:3px;cursor:pointer}
-  input[type=range]::-moz-range-thumb{width:20px;height:20px;background:#fff;border:2px solid rgba(0,0,0,.3);border-radius:50%;cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:28px;height:28px;background:#fff;border:2px solid rgba(0,0,0,.3);border-radius:50%;cursor:pointer}
+  @media(pointer:fine){input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px}input[type=range]::-moz-range-thumb{width:20px;height:20px}}
+  @media(max-width:480px){.ui-panel{left:8px!important;right:8px!important;bottom:8px!important;min-width:auto!important}}
   `;
   document.head.appendChild(styleEl);
 }
