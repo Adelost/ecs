@@ -21,7 +21,7 @@ import { MaterialSystem } from './ecs/systems/material';
 
 // Time configuration
 // One Earth day = 2 minutes real time (default), everything else derived from that.
-const REAL_SECONDS_PER_EARTH_DAY = 10; // 1 day = 10 seconds
+const REAL_SECONDS_PER_EARTH_DAY = 8; // 1 day = 8 seconds
 const EARTH_DAYS_PER_YEAR = 365.25;         // Earth rotations per orbit
 
 // Derived speeds (in rotations per real second)

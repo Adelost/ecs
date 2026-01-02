@@ -51,8 +51,8 @@ function ensureCSS() {
   .ui-chip,.ui-button{padding:10px 16px;border:1px solid ${C.surface2};border-radius:10px;background:${C.surface0};color:${C.text};cursor:pointer;font-size:14px;font-weight:500;transition:all .15s ease;user-select:none;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
   .ui-chip:hover,.ui-button:hover{background:${C.surface1};border-color:${C.overlay0}}
   .ui-chip:active,.ui-button:active{transform:scale(0.97)}
-  .ui-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .ui-row>.ui-chip{flex:1 1 auto;min-width:60px}
+  .ui-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .ui-row>.ui-chip{flex:1 1 auto;min-width:0;padding:8px 10px}
   .ui-divider{border:none;border-top:1px solid ${C.surface1};margin:14px 0}
   .ui-readout{font-size:13px;color:${C.subtext1};margin-top:10px;text-align:center}
   input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;background:${C.surface1};border-radius:4px;outline:none;padding:0;margin:14px 0;touch-action:none}
