@@ -9,7 +9,7 @@ type Inst = { group: Group; mesh: Mesh; baseQuat: Quaternion; spinAxis: Vector3;
 
 export class RenderSystem {
   private map = new Map<number, Inst>();
-  private icoSubdivisions = 4;
+  private icoSubdivisions = 8;
   constructor(private engine: Engine) {}
 
   getInst(eid: number): Inst | undefined { return this.map.get(eid); }
