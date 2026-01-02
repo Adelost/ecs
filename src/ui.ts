@@ -61,10 +61,14 @@ function ensureCSS() {
   input[type=range]::-moz-range-track{width:100%;height:8px;background:${C.surface1};border-radius:4px;cursor:pointer}
   input[type=range]::-moz-range-thumb{width:28px;height:28px;background:${C.text};border:none;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4)}
   @media(pointer:coarse){
-    input[type=range]::-webkit-slider-thumb{width:36px;height:36px;margin-top:-14px}
-    input[type=range]::-moz-range-thumb{width:36px;height:36px}
-    input[type=range]{height:10px;margin:18px 0}
-    .ui-chip,.ui-button{min-height:48px;padding:12px 20px;font-size:15px}
+    input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-8px}
+    input[type=range]::-moz-range-thumb{width:24px;height:24px}
+    input[type=range]{height:6px;margin:10px 0}
+    .ui-chip,.ui-button{min-height:32px;padding:6px 10px;font-size:12px}
+    .ui-panel{padding:10px}
+    .ui-header{margin:0 0 6px 0;font-size:9px}
+    .ui-divider{margin:8px 0}
+    .ui-row{gap:4px}
   }
   @media(max-width:480px){
     .ui-panel{max-width:calc(100vw - 24px)}
