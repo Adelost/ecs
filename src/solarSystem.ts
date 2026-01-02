@@ -282,8 +282,8 @@ function bootstrap() {
   // Run one step to let OrbitSystem position planets before centering camera
   world.step(0);
 
-  // Center camera on Earth (at distance 10 from sun) with higher zoom
-  const targetZoom = 200;
+  // Center camera on Earth with default zoom
+  const targetZoom = 100;
   const canvas = engine.renderer.domElement;
   const viewWidth = canvas.clientWidth / targetZoom;
   const viewHeight = canvas.clientHeight / targetZoom;
