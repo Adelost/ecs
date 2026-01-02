@@ -24,24 +24,41 @@ export interface UIManager {
   destroy(): void;
 }
 
+// Catppuccin Mocha palette
+const C = {
+  base: '#1e1e2e',
+  surface0: '#313244',
+  surface1: '#45475a',
+  surface2: '#585b70',
+  overlay0: '#6c7086',
+  text: '#cdd6f4',
+  subtext0: '#a6adc8',
+  subtext1: '#bac2de',
+  blue: '#89b4fa',
+  green: '#a6e3a1',
+  peach: '#fab387',
+  mauve: '#cba6f7',
+};
+
 let _cssInjected = false;
 function ensureCSS() {
   if (_cssInjected) return;
   _cssInjected = true;
   const styleEl = document.createElement('style');
   styleEl.textContent = `
-  .ui-panel{position:fixed;padding:12px;background:rgba(0,0,0,0.6);border-radius:8px;color:#fff;font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;backdrop-filter:blur(8px)}
-  .ui-header{margin:0 0 8px 0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
-  .ui-chip,.ui-button{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:11px;font-weight:500;transition:all .2s;user-select:none}
-  .ui-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .ui-divider{border-top:1px solid rgba(255,255,255,.15);margin:10px 0 8px 0}
-  .ui-readout{font-size:12px;opacity:.9;margin-top:6px;text-align:center}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:transparent;outline:none;padding:0;margin:8px 0;touch-action:none}
-  input[type=range]::-webkit-slider-runnable-track{width:100%;height:6px;background:rgba(255,255,255,.6)!important;border-radius:3px;cursor:pointer}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;background:#fff;border-radius:50%;cursor:pointer;border:2px solid rgba(0,0,0,.3);margin-top:-11px;position:relative}
-  input[type=range]::-moz-range-track{width:100%;height:6px;background:rgba(255,255,255,.6);border-radius:3px;cursor:pointer}
-  input[type=range]::-moz-range-thumb{width:28px;height:28px;background:#fff;border:2px solid rgba(0,0,0,.3);border-radius:50%;cursor:pointer}
-  @media(pointer:fine){input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px}input[type=range]::-moz-range-thumb{width:20px;height:20px}}
+  .ui-panel{position:fixed;padding:16px;background:${C.base}ee;border:1px solid ${C.surface1};border-radius:12px;color:${C.text};font:13px/1.5 'Inter',system-ui,-apple-system,sans-serif;backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,.4)}
+  .ui-header{margin:0 0 10px 0;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:${C.subtext0}}
+  .ui-chip,.ui-button{padding:6px 14px;border:1px solid ${C.surface2};border-radius:8px;background:${C.surface0};color:${C.text};cursor:pointer;font-size:12px;font-weight:500;transition:all .15s ease;user-select:none}
+  .ui-chip:hover,.ui-button:hover{background:${C.surface1};border-color:${C.overlay0}}
+  .ui-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ui-divider{border:none;border-top:1px solid ${C.surface1};margin:12px 0}
+  .ui-readout{font-size:12px;color:${C.subtext1};margin-top:8px;text-align:center}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:${C.surface1};border-radius:2px;outline:none;padding:0;margin:10px 0;touch-action:none}
+  input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;background:${C.surface1};border-radius:2px;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;background:${C.text};border-radius:50%;cursor:pointer;border:none;margin-top:-8px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  input[type=range]::-moz-range-track{width:100%;height:4px;background:${C.surface1};border-radius:2px;cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;background:${C.text};border:none;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  @media(pointer:coarse){input[type=range]::-webkit-slider-thumb{width:28px;height:28px;margin-top:-12px}input[type=range]::-moz-range-thumb{width:28px;height:28px}}
   @media(max-width:480px){.ui-panel{left:8px!important;right:8px!important;bottom:8px!important;min-width:auto!important}}
   `;
   document.head.appendChild(styleEl);
@@ -76,9 +93,9 @@ export function createUI(root: HTMLElement | Document = document): UIManager {
 
     function addHeader(text: string) { const d = document.createElement('div'); d.className='ui-header'; d.textContent=text; panel.appendChild(d); return d; }
     function addDivider() { const d = document.createElement('div'); d.className='ui-divider'; panel.appendChild(d); return d; }
-    function addText(opts: UITextOpts) { const d = document.createElement('div'); d.textContent = opts.text; d.style.opacity='0.9'; d.style.fontSize='12px'; d.style.textAlign='center'; panel.appendChild(d); return d; }
+    function addText(opts: UITextOpts) { const d = document.createElement('div'); d.textContent = opts.text; d.style.color=C.subtext1; d.style.fontSize='12px'; d.style.textAlign='center'; panel.appendChild(d); return d; }
     function addButton(opts: UIButtonOpts) { const b = document.createElement('button'); b.className='ui-button'; b.textContent = opts.label; b.addEventListener('click', opts.onClick); panel.appendChild(b); return b; }
-    function addChip(opts: UIChipOpts) { const b = document.createElement('button'); b.className='ui-chip'; b.textContent = opts.label; const setActive=(on:boolean)=>{ b.style.background = on? 'rgba(29,185,84,0.3)':'rgba(255,255,255,0.1)'; b.style.borderColor = on? 'rgba(29,185,84,0.6)':'rgba(255,255,255,0.3)'; }; let active = !!opts.active; setActive(active); b.addEventListener('click',(e)=>{ if (opts.toggle){ active=!active; setActive(active); opts.onToggle?.(active);} opts.onClick?.(e); }); panel.appendChild(b); return b; }
+    function addChip(opts: UIChipOpts) { const b = document.createElement('button'); b.className='ui-chip'; b.textContent = opts.label; const setActive=(on:boolean)=>{ b.style.background = on? C.surface1 : C.surface0; b.style.borderColor = on? C.mauve : C.surface2; b.style.color = on? C.mauve : C.text; }; let active = !!opts.active; setActive(active); b.addEventListener('click',(e)=>{ if (opts.toggle){ active=!active; setActive(active); opts.onToggle?.(active);} opts.onClick?.(e); }); panel.appendChild(b); return b; }
     function addSlider(opts: UISliderOpts) {
       const root = document.createElement('div');
       const labelEl = opts.label ? document.createElement('div') : undefined;
@@ -86,11 +103,11 @@ export function createUI(root: HTMLElement | Document = document): UIManager {
       const input = document.createElement('input'); input.type='range'; input.min=`${opts.min}`; input.max=`${opts.max}`; input.step=`${opts.step ?? 1}`; if (opts.value !== undefined) input.value = `${opts.value}`; input.addEventListener('input', ()=>{ const v = parseFloat(input.value); opts.onInput?.(v); }); root.appendChild(input); panel.appendChild(root); return { root, input, labelEl };
     }
     function addProfiler(getRows: ()=>Array<{system:string; avgMs:number}>, onEnable: (on:boolean)=>void) {
-      const chip = document.createElement('button'); chip.className='ui-chip'; chip.style.width='100%'; chip.textContent='⚡ Profiler';
-      const pre = document.createElement('pre'); pre.style.margin='6px 0 0 0'; pre.style.padding='8px'; pre.style.background='rgba(0,0,0,0.4)'; pre.style.borderRadius='6px'; pre.style.maxHeight='140px'; pre.style.overflow='auto'; pre.style.display='none'; pre.style.fontSize='10px'; pre.style.lineHeight='1.4'; pre.style.fontFamily='monospace';
+      const chip = document.createElement('button'); chip.className='ui-chip'; chip.style.width='100%'; chip.textContent='Profiler';
+      const pre = document.createElement('pre'); pre.style.margin='8px 0 0 0'; pre.style.padding='10px'; pre.style.background=C.surface0; pre.style.border=`1px solid ${C.surface1}`; pre.style.borderRadius='8px'; pre.style.maxHeight='140px'; pre.style.overflow='auto'; pre.style.display='none'; pre.style.fontSize='11px'; pre.style.lineHeight='1.5'; pre.style.fontFamily=`'JetBrains Mono','Fira Code',monospace`; pre.style.color=C.subtext1;
       panel.appendChild(chip); panel.appendChild(pre);
       let on = false; let timer: number | null = null;
-      const set = (v:boolean)=>{ on=v; chip.style.background = on?'rgba(252,211,77,0.3)':'rgba(255,255,255,0.1)'; chip.style.borderColor = on?'rgba(252,211,77,0.6)':'rgba(255,255,255,0.3)'; pre.style.display = on?'block':'none'; onEnable(on); if (timer){ clearInterval(timer); timer=null; } if (on){ const refresh=()=>{ const rows=getRows(); pre.textContent = rows.map(r=>`${r.system.padEnd(12)} ${r.avgMs.toFixed(2)}ms`).join('\n') || 'No data...'; }; refresh(); timer = window.setInterval(refresh, 1000) as unknown as number; }};
+      const set = (v:boolean)=>{ on=v; chip.style.background = on? C.surface1 : C.surface0; chip.style.borderColor = on? C.peach : C.surface2; chip.style.color = on? C.peach : C.text; pre.style.display = on?'block':'none'; onEnable(on); if (timer){ clearInterval(timer); timer=null; } if (on){ const refresh=()=>{ const rows=getRows(); pre.textContent = rows.map(r=>`${r.system.padEnd(12)} ${r.avgMs.toFixed(2)}ms`).join('\n') || 'No data...'; }; refresh(); timer = window.setInterval(refresh, 1000) as unknown as number; }};
       chip.addEventListener('click', (e)=>{ e.stopPropagation(); set(!on); });
       return { chip, panel: pre, set };
     }
