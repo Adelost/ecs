@@ -350,7 +350,7 @@ function setupControls(engine: ReturnType<typeof createEngine>, world: World) {
   styleRow.appendChild(styleLabel); styleRow.appendChild(texturedBtn); styleRow.appendChild(autoBtn);
 
   panel.addHeader('Detail');
-  const detailSliderCtl = panel.addSlider({ min: 0, max: 20, step: 1, value: 4 });
+  const detailSliderCtl = panel.addSlider({ min: 0, max: 20, step: 1, value: 8 });
   const detailInfo = document.createElement('div'); detailInfo.style.fontSize='11px'; detailInfo.style.opacity='0.8'; detailInfo.style.textAlign='center'; detailInfo.style.marginTop='4px'; panel.el.appendChild(detailInfo);
   function updateDetailInfo(){ const n = parseInt(detailSliderCtl.input.value, 10); const faces = 20 * (n + 1) * (n + 1); const label = n === 0 ? 'Icosahedron' : `Subdiv ${n}`; detailInfo.textContent = `${label} • triangles ${faces.toLocaleString()}`; }
   detailSliderCtl.input.addEventListener('input', ()=>{ const n = parseInt(detailSliderCtl.input.value, 10); const res:any = (world as any).getResource('render'); if (res?.setAutoSubdiv) res.setAutoSubdiv(n); updateDetailInfo(); }); updateDetailInfo();
@@ -740,7 +740,7 @@ function setupSpeedUI(world: World) {
   detailSlider.min = '0';
   detailSlider.max = '20';
   detailSlider.step = '1';
-  detailSlider.value = '4';
+  detailSlider.value = '8';
   detailSlider.style.width = '100%';
   detailSlider.style.display = 'block';
   detailSlider.style.margin = '8px 0';
