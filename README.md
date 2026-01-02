@@ -7,7 +7,7 @@ Interactive 3D solar system built with Three.js and a minimal ECS architecture.
 ## Features
 
 - Accurate orbital mechanics and axial tilts
-- Two visual modes: stylized (Imphenzia-style) and realistic textures
+- Two visual modes: stylized and realistic textures
 - Rings, clouds, and atmospheric effects
 - Real-time speed control
 

@@ -28,7 +28,7 @@ export const Trail = component<{ step: number; cap: number; lines: any[]; last?:
 // Visual style selector: 'auto' (palette-baked low-poly) or 'textured' (realistic maps)
 export const Style = component<{ mode: 'auto' | 'textured' }>('Style');
 
-// Baked vertex colors (Imphenzia): MaterialSystem computes; RenderSystem applies
+// Baked vertex colors (stylized mode): MaterialSystem computes; RenderSystem applies
 export const BakedVertexColors = component<{ colors: Float32Array }>('BakedVertexColors');
 // Clouds low-poly colors (auto mode)
 export const CloudBakedColors = component<{ colors: Float32Array; alpha: Float32Array }>('CloudBakedColors');

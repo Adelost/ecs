@@ -183,11 +183,8 @@ const SOLAR_SYSTEM = {
   ] as LightConfig[]
 };
 
-// Style flag: default to Imphenzia (palette) look, allow override via ?style=realistic
-// Style flags removed; auto palette is always enabled
-
-function withStyle(objects: ObjectConfig[], imphenzia: boolean): ObjectConfig[] {
-  // ECS MaterialSystem handles Imphenzia style; do not override materials here.
+function withStyle(objects: ObjectConfig[], stylized: boolean): ObjectConfig[] {
+  // ECS MaterialSystem handles stylized mode; do not override materials here.
   return objects;
 }
 
