@@ -21,7 +21,7 @@ import { MaterialSystem } from './ecs/systems/material';
 
 // Time configuration
 // One Earth day = 2 minutes real time (default), everything else derived from that.
-const REAL_SECONDS_PER_EARTH_DAY = 2 * 60; // 2 minutes
+const REAL_SECONDS_PER_EARTH_DAY = 10; // 1 day = 10 seconds
 const EARTH_DAYS_PER_YEAR = 365.25;         // Earth rotations per orbit
 
 // Derived speeds (in rotations per real second)
@@ -155,29 +155,28 @@ const SOLAR_SYSTEM = {
   objects: [
     Templates.star('sun', 3, '#FFA726'),
     
-    Templates.planet('mercury', 'sun', 5, ORBIT_FREQ.mercury * EARTH_ORBIT_SPEED, { size: 0.5, tilt: 0.03, spinSpeed: ROTATION_SPEED.mercury, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/mercury.png`, bump: `${BASE}assets/planets/mercury-bump.jpg`, usePhong: true } as any }),
-    Templates.planet('venus', 'sun', 7, ORBIT_FREQ.venus * EARTH_ORBIT_SPEED, { size: 0.9, tilt: 177.36, spinSpeed: ROTATION_SPEED.venus, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/venus.png`, bump: `${BASE}assets/planets/venus-bump.jpg`, usePhong: true } as any }),
-    Templates.planet('earth', 'sun', 10, ORBIT_FREQ.earth * EARTH_ORBIT_SPEED, { size: 1, tilt: 23.44, spinSpeed: ROTATION_SPEED.earth, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/earth.png`, bump: `${BASE}assets/planets/earth-bump.jpg`, specular: `${BASE}assets/planets/earth-specular.jpg`, usePhong: true } as any, atmosphere: { map: `${BASE}assets/planets/earth-clouds.jpg`, alpha: `${BASE}assets/planets/earth-clouds-alpha.jpg`, scale: 1.03, spinSpeed: 0.005 } }),
+    Templates.planet('mercury', 'sun', 5, ORBIT_FREQ.mercury * EARTH_ORBIT_SPEED, { size: 0.5, tilt: 0.03, spinSpeed: ROTATION_SPEED.mercury, material: { type: 'map', map: `${BASE}assets/planets/mercury.png`, bump: `${BASE}assets/planets/mercury-bump.jpg`, usePhong: true } as any }),
+    Templates.planet('venus', 'sun', 7, ORBIT_FREQ.venus * EARTH_ORBIT_SPEED, { size: 0.9, tilt: 177.36, spinSpeed: ROTATION_SPEED.venus, material: { type: 'map', map: `${BASE}assets/planets/venus.png`, bump: `${BASE}assets/planets/venus-bump.jpg`, usePhong: true } as any }),
+    Templates.planet('earth', 'sun', 10, ORBIT_FREQ.earth * EARTH_ORBIT_SPEED, { size: 1, tilt: 23.44, spinSpeed: ROTATION_SPEED.earth, material: { type: 'map', map: `${BASE}assets/planets/earth.png`, bump: `${BASE}assets/planets/earth-bump.jpg`, specular: `${BASE}assets/planets/earth-specular.jpg`, usePhong: true } as any, atmosphere: { map: `${BASE}assets/planets/earth-clouds.jpg`, alpha: `${BASE}assets/planets/earth-clouds-alpha.jpg`, scale: 1.03, spinSpeed: 0.005 } }),
     // Moon with proper texture and bump; tidally locked by equal orbit/spin speeds
     Templates.planet('moon', 'earth', 1.8, MOON_ORBIT_SPEED, {
       size: 0.3,
       tilt: 6.68,
       spinSpeed: MOON_ORBIT_SPEED,
-      segments: { width: 48, height: 24 },
       material: { type: 'map', map: `${BASE}assets/planets/moon.png`, bump: `${BASE}assets/planets/moon-bump.jpg`, usePhong: true } as any
     }),
-    Templates.planet('mars', 'sun', 13, ORBIT_FREQ.mars * EARTH_ORBIT_SPEED, { size: 0.7, tilt: 25.19, spinSpeed: ROTATION_SPEED.mars, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/mars.png`, bump: `${BASE}assets/planets/mars-bump.jpg`, usePhong: true } as any }),
-    Templates.planet('jupiter', 'sun', 18, ORBIT_FREQ.jupiter * EARTH_ORBIT_SPEED, { size: 2.2, tilt: 3.13, spinSpeed: ROTATION_SPEED.jupiter, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/jupiter.png`, usePhong: true } as any }),
+    Templates.planet('mars', 'sun', 13, ORBIT_FREQ.mars * EARTH_ORBIT_SPEED, { size: 0.7, tilt: 25.19, spinSpeed: ROTATION_SPEED.mars, material: { type: 'map', map: `${BASE}assets/planets/mars.png`, bump: `${BASE}assets/planets/mars-bump.jpg`, usePhong: true } as any }),
+    Templates.planet('jupiter', 'sun', 18, ORBIT_FREQ.jupiter * EARTH_ORBIT_SPEED, { size: 2.2, tilt: 3.13, spinSpeed: ROTATION_SPEED.jupiter, material: { type: 'map', map: `${BASE}assets/planets/jupiter.png`, usePhong: true } as any }),
     // Jupiter's Galilean moons (tidally locked)
-    Templates.planet('io', 'jupiter', 1.4, MOON_EXTRA_SPEED.io, { size: 0.35, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.io, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/io.jpg`, usePhong: true } as any }),
-    Templates.planet('europa', 'jupiter', 1.8, MOON_EXTRA_SPEED.europa, { size: 0.32, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.europa, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/europa.jpg`, usePhong: true } as any }),
-    Templates.planet('ganymede', 'jupiter', 2.3, MOON_EXTRA_SPEED.ganymede, { size: 0.50, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.ganymede, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/ganymede.jpg`, usePhong: true } as any }),
-    Templates.planet('callisto', 'jupiter', 2.8, MOON_EXTRA_SPEED.callisto, { size: 0.46, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.callisto, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/callisto.jpg`, usePhong: true } as any }),
-    Templates.planet('saturn', 'sun', 24, ORBIT_FREQ.saturn * EARTH_ORBIT_SPEED, { size: 1.9, tilt: 26.73, spinSpeed: ROTATION_SPEED.saturn, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/saturn.png`, usePhong: true } as any, rings: { texture: `${BASE}assets/rings/saturn.png`, inner: 1.23, outer: 2.30 } }),
-    Templates.planet('titan', 'saturn', 2.4, MOON_EXTRA_SPEED.titan, { size: 0.45, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.titan, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/titan.webp`, usePhong: true } as any }),
-    Templates.planet('uranus', 'sun', 30, ORBIT_FREQ.uranus * EARTH_ORBIT_SPEED, { size: 1.4, tilt: 97.77, spinSpeed: ROTATION_SPEED.uranus, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/uranus.png`, usePhong: true } as any, rings: { texture: `${BASE}assets/rings/uranus.png`, inner: 1.70, outer: 2.05 } }),
-    Templates.planet('neptune', 'sun', 36, ORBIT_FREQ.neptune * EARTH_ORBIT_SPEED, { size: 1.3, tilt: 28.32, spinSpeed: ROTATION_SPEED.neptune, segments: { width: 64, height: 32 }, material: { type: 'map', map: `${BASE}assets/planets/neptune.png`, usePhong: true } as any }),
-    Templates.planet('triton', 'neptune', 1.8, MOON_EXTRA_SPEED.triton, { size: 0.30, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.triton, segments: { width: 48, height: 24 }, material: { type: 'map', map: `${BASE}assets/moons/triton.jpg`, usePhong: true } as any }),
+    Templates.planet('io', 'jupiter', 1.4, MOON_EXTRA_SPEED.io, { size: 0.35, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.io, material: { type: 'map', map: `${BASE}assets/moons/io.jpg`, usePhong: true } as any }),
+    Templates.planet('europa', 'jupiter', 1.8, MOON_EXTRA_SPEED.europa, { size: 0.32, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.europa, material: { type: 'map', map: `${BASE}assets/moons/europa.jpg`, usePhong: true } as any }),
+    Templates.planet('ganymede', 'jupiter', 2.3, MOON_EXTRA_SPEED.ganymede, { size: 0.50, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.ganymede, material: { type: 'map', map: `${BASE}assets/moons/ganymede.jpg`, usePhong: true } as any }),
+    Templates.planet('callisto', 'jupiter', 2.8, MOON_EXTRA_SPEED.callisto, { size: 0.46, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.callisto, material: { type: 'map', map: `${BASE}assets/moons/callisto.jpg`, usePhong: true } as any }),
+    Templates.planet('saturn', 'sun', 24, ORBIT_FREQ.saturn * EARTH_ORBIT_SPEED, { size: 1.9, tilt: 26.73, spinSpeed: ROTATION_SPEED.saturn, material: { type: 'map', map: `${BASE}assets/planets/saturn.png`, usePhong: true } as any, rings: { texture: `${BASE}assets/rings/saturn.png`, inner: 1.23, outer: 2.30 } }),
+    Templates.planet('titan', 'saturn', 2.4, MOON_EXTRA_SPEED.titan, { size: 0.45, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.titan, material: { type: 'map', map: `${BASE}assets/moons/titan.webp`, usePhong: true } as any }),
+    Templates.planet('uranus', 'sun', 30, ORBIT_FREQ.uranus * EARTH_ORBIT_SPEED, { size: 1.4, tilt: 97.77, spinSpeed: ROTATION_SPEED.uranus, material: { type: 'map', map: `${BASE}assets/planets/uranus.png`, usePhong: true } as any, rings: { texture: `${BASE}assets/rings/uranus.png`, inner: 1.70, outer: 2.05 } }),
+    Templates.planet('neptune', 'sun', 36, ORBIT_FREQ.neptune * EARTH_ORBIT_SPEED, { size: 1.3, tilt: 28.32, spinSpeed: ROTATION_SPEED.neptune, material: { type: 'map', map: `${BASE}assets/planets/neptune.png`, usePhong: true } as any }),
+    Templates.planet('triton', 'neptune', 1.8, MOON_EXTRA_SPEED.triton, { size: 0.30, tilt: 0, spinSpeed: MOON_EXTRA_SPEED.triton, material: { type: 'map', map: `${BASE}assets/moons/triton.jpg`, usePhong: true } as any }),
     Templates.planet('pluto', 'sun', 42, ORBIT_FREQ.pluto * EARTH_ORBIT_SPEED, { size: 0.4, color: '#8D6E63', tilt: 120, spinSpeed: ROTATION_SPEED.pluto })
   ],
   lighting: [
@@ -279,6 +278,11 @@ function bootstrap() {
 
 
   window.addEventListener('resize', () => { engine.setCanvasSize(container.clientWidth, container.clientHeight); });
+
+  // Center camera on Earth (at distance 10 from sun) with higher zoom
+  const view = engine.getView();
+  const earthX = 10;
+  engine.setView({ x: earthX - view.size.width / 2, y: -view.size.height / 2 }, 200);
 
   let lastTime = 0;
   function animate(time: number) {
